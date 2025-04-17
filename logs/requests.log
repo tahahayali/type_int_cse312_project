@@ -1,0 +1,130 @@
+Exception on / [GET]
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 920, in full_dispatch_request
+    return self.finalize_request(rv)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 941, in finalize_request
+    response = self.process_response(response)
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1319, in process_response
+    response = self.ensure_sync(func)(response)
+  File "/app/util/backend/logger.py", line 26, in log_request
+    timestamp = datetime.now(datetime.timezone.utc).isoformat()
+                             ^^^^^^^^^^^^^^^^^
+AttributeError: type object 'datetime.datetime' has no attribute 'timezone'. Did you mean: 'astimezone'?
+Request finalizing failed with an error while handling an error
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 920, in full_dispatch_request
+    return self.finalize_request(rv)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 941, in finalize_request
+    response = self.process_response(response)
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1319, in process_response
+    response = self.ensure_sync(func)(response)
+  File "/app/util/backend/logger.py", line 26, in log_request
+    timestamp = datetime.now(datetime.timezone.utc).isoformat()
+                             ^^^^^^^^^^^^^^^^^
+AttributeError: type object 'datetime.datetime' has no attribute 'timezone'. Did you mean: 'astimezone'?
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 941, in finalize_request
+    response = self.process_response(response)
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1319, in process_response
+    response = self.ensure_sync(func)(response)
+  File "/app/util/backend/logger.py", line 26, in log_request
+    timestamp = datetime.now(datetime.timezone.utc).isoformat()
+                             ^^^^^^^^^^^^^^^^^
+AttributeError: type object 'datetime.datetime' has no attribute 'timezone'. Did you mean: 'astimezone'?
+Exception on / [GET]
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 920, in full_dispatch_request
+    return self.finalize_request(rv)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 941, in finalize_request
+    response = self.process_response(response)
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1319, in process_response
+    response = self.ensure_sync(func)(response)
+  File "/app/util/backend/logger.py", line 26, in log_request
+    timestamp = datetime.now(datetime.timezone.utc).isoformat()
+                             ^^^^^^^^^^^^^^^^^
+AttributeError: type object 'datetime.datetime' has no attribute 'timezone'. Did you mean: 'astimezone'?
+Request finalizing failed with an error while handling an error
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 920, in full_dispatch_request
+    return self.finalize_request(rv)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 941, in finalize_request
+    response = self.process_response(response)
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1319, in process_response
+    response = self.ensure_sync(func)(response)
+  File "/app/util/backend/logger.py", line 26, in log_request
+    timestamp = datetime.now(datetime.timezone.utc).isoformat()
+                             ^^^^^^^^^^^^^^^^^
+AttributeError: type object 'datetime.datetime' has no attribute 'timezone'. Did you mean: 'astimezone'?
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 941, in finalize_request
+    response = self.process_response(response)
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1319, in process_response
+    response = self.ensure_sync(func)(response)
+  File "/app/util/backend/logger.py", line 26, in log_request
+    timestamp = datetime.now(datetime.timezone.utc).isoformat()
+                             ^^^^^^^^^^^^^^^^^
+AttributeError: type object 'datetime.datetime' has no attribute 'timezone'. Did you mean: 'astimezone'?
+Exception on /favicon.ico [GET]
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 920, in full_dispatch_request
+    return self.finalize_request(rv)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 941, in finalize_request
+    response = self.process_response(response)
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1319, in process_response
+    response = self.ensure_sync(func)(response)
+  File "/app/util/backend/logger.py", line 26, in log_request
+    timestamp = datetime.now(datetime.timezone.utc).isoformat()
+                             ^^^^^^^^^^^^^^^^^
+AttributeError: type object 'datetime.datetime' has no attribute 'timezone'. Did you mean: 'astimezone'?
+Request finalizing failed with an error while handling an error
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 920, in full_dispatch_request
+    return self.finalize_request(rv)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 941, in finalize_request
+    response = self.process_response(response)
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1319, in process_response
+    response = self.ensure_sync(func)(response)
+  File "/app/util/backend/logger.py", line 26, in log_request
+    timestamp = datetime.now(datetime.timezone.utc).isoformat()
+                             ^^^^^^^^^^^^^^^^^
+AttributeError: type object 'datetime.datetime' has no attribute 'timezone'. Did you mean: 'astimezone'?
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 941, in finalize_request
+    response = self.process_response(response)
+  File "/usr/local/lib/python3.13/site-packages/flask/app.py", line 1319, in process_response
+    response = self.ensure_sync(func)(response)
+  File "/app/util/backend/logger.py", line 26, in log_request
+    timestamp = datetime.now(datetime.timezone.utc).isoformat()
+                             ^^^^^^^^^^^^^^^^^
+AttributeError: type object 'datetime.datetime' has no attribute 'timezone'. Did you mean: 'astimezone'?
+[2025-04-17T16:45:27.938734+00:00] 172.19.0.1 GET / -> 200
+[2025-04-17T16:45:28.021314+00:00] 172.19.0.1 GET /favicon.ico -> 404
+[2025-04-17T16:46:49.835805+00:00] 172.19.0.1 GET / -> 304
+[2025-04-17T16:47:06.280942+00:00] 172.19.0.1 GET / -> 200
