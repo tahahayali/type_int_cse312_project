@@ -21,9 +21,10 @@ def logout():
     pass
 
 
-@app.route('/api/tag')
-def start_tag():
-    pass
+@app.route('/game')
+def game():
+    return send_from_directory("public/html", "game.html")
+
 
 @app.route('/')
 def index():
