@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Phaser Multiplayer Tag</title>
+  <!-- Load Phaser and Socket.IO libraries -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <style>
@@ -14,77 +15,99 @@
 <script type="text/javascript">
 class GameScene extends Phaser.Scene {
     constructor() {
-        super('GameScene');
+        super('GameScene'); // Unique name for this scene
     }
 
     preload() {
+        // Set base URL for asset loading
         this.load.setBaseURL('https://cdn.phaserfiles.com/v385');
+
+        // Load dungeon tileset image
         this.load.image('tiles', 'assets/tilemaps/tiles/buch-dungeon-tileset.png');
     }
 
     create() {
-        this.tileSize = 16;
+        this.tileSize = 16; // Each tile is 16x16 pixels
         const mapWidth = 23, mapHeight = 17;
 
+        // Create a blank tilemap and add tileset to it
         this.map = this.make.tilemap({ tileWidth: this.tileSize, tileHeight: this.tileSize, width: mapWidth, height: mapHeight });
         const tiles = this.map.addTilesetImage('tiles');
 
+        // Create ground and object layers and scale them for visibility
         this.groundLayer = this.map.createBlankLayer('Ground', tiles).setScale(2);
         this.objectLayer = this.map.createBlankLayer('Objects', tiles).setScale(2);
+
+        // Adjust camera scroll to center the map
         this.cameras.main.setScroll(-27, -27);
 
+        // Randomly decorate the room with tiles
         this.randomizeRoom();
 
-        this.socket = io();
-        this.players = {};
-        this.myID = null;
-        this.isIt = false;
+        // === Set up WebSocket and player state ===
+        this.socket = io();         // Connect to WebSocket server (same origin)
+        this.players = {};          // Tracks all other players
+        this.myID = null;           // This client’s unique socket ID
+        this.isIt = false;          // Whether this player is currently "it"
 
+        // === Create the local player ===
         const spawnX = Phaser.Math.Between(2, mapWidth - 3) * this.tileSize * 2;
         const spawnY = Phaser.Math.Between(2, mapHeight - 3) * this.tileSize * 2;
-        this.player = this.add.rectangle(spawnX, spawnY, 32, 32, 0x00ff00);
+        this.player = this.add.rectangle(spawnX, spawnY, 32, 32, 0x00ff00); // Green box = self
 
+        // Notify server of initial position
         this.socket.emit("move", { x: this.player.x, y: this.player.y });
 
+        // === Server tells us the current game state ===
         this.socket.on("init", (data) => {
             this.myID = data.id;
             this.isIt = data.players[this.myID].it;
-            this.updatePlayerColor();
+            this.updatePlayerColor(); // Red if "it", green if not
 
+            // Create other players
             for (let id in data.players) {
                 if (id !== this.myID) {
                     const p = data.players[id];
-                    const color = p.it ? 0xff0000 : 0x0000ff;
+                    const color = p.it ? 0xff0000 : 0x0000ff; // Red if "it", blue otherwise
                     this.players[id] = this.add.rectangle(p.x, p.y, 32, 32, color);
                 }
             }
         });
 
+        // === Server tells us a new player joined ===
         this.socket.on("playerJoined", (data) => {
             const color = data.it ? 0xff0000 : 0x0000ff;
             this.players[data.id] = this.add.rectangle(data.x, data.y, 32, 32, color);
         });
 
+        // === Server tells us someone moved ===
         this.socket.on("playerMoved", (data) => {
-            if (data.id === this.myID) return;
+            if (data.id === this.myID) return; // Ignore our own moves
+
             const player = this.players[data.id];
             if (!player) {
+                // If new player, add them
                 this.players[data.id] = this.add.rectangle(data.x, data.y, 32, 32, 0x0000ff);
             } else {
+                // Update position
                 player.x = data.x;
                 player.y = data.y;
             }
         });
 
+        // === Server tells us a player left ===
         this.socket.on("playerLeft", (data) => {
             if (this.players[data.id]) {
-                this.players[data.id].destroy();
-                delete this.players[data.id];
+                this.players[data.id].destroy(); // Remove sprite
+                delete this.players[data.id];     // Clean up
             }
         });
 
+        // === Server notifies a tag happened ===
         this.socket.on("tagUpdate", (data) => {
             const { newIt, prevIt } = data;
+
+            // Update local player's status
             if (newIt === this.myID) {
                 this.isIt = true;
                 this.updatePlayerColor();
@@ -93,14 +116,16 @@ class GameScene extends Phaser.Scene {
                 this.updatePlayerColor();
             }
 
+            // Update visuals for other players
             if (this.players[newIt]) {
-                this.players[newIt].setFillStyle(0xff0000); // new "it" in red
+                this.players[newIt].setFillStyle(0xff0000); // Red = "it"
             }
             if (this.players[prevIt]) {
-                this.players[prevIt].setFillStyle(0x0000ff); // no longer "it"
+                this.players[prevIt].setFillStyle(0x0000ff); // Blue = no longer "it"
             }
         });
 
+        // Setup keyboard input
         this.cursors = this.input.keyboard.createCursorKeys();
     }
 
@@ -108,21 +133,29 @@ class GameScene extends Phaser.Scene {
         let moved = false;
         const speed = 2;
 
+        // === Handle movement input ===
         if (this.cursors.left.isDown) { this.player.x -= speed; moved = true; }
         if (this.cursors.right.isDown) { this.player.x += speed; moved = true; }
         if (this.cursors.up.isDown) { this.player.y -= speed; moved = true; }
         if (this.cursors.down.isDown) { this.player.y += speed; moved = true; }
 
+        // === Emit movement to server ===
         if (moved && this.socket) {
             this.socket.emit("move", { x: this.player.x, y: this.player.y });
         }
 
+        // === Check for tag collisions if we are "it" ===
         if (this.isIt) {
             for (let id in this.players) {
                 const other = this.players[id];
                 if (!other) continue;
 
-                const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, other.x, other.y);
+                const dist = Phaser.Math.Distance.Between(
+                    this.player.x, this.player.y,
+                    other.x, other.y
+                );
+
+                // If player is within tag range
                 if (dist < 32) {
                     this.socket.emit("tag", { id });
                 }
@@ -130,24 +163,28 @@ class GameScene extends Phaser.Scene {
         }
     }
 
+    // === Updates the local player's color based on "it" status ===
     updatePlayerColor() {
         const color = this.isIt ? 0xff0000 : 0x00ff00;
         this.player.setFillStyle(color);
     }
 
+    // === Randomly decorate the room using weighted tile placement ===
     randomizeRoom() {
         const w = this.map.width;
         const h = this.map.height;
 
-        this.groundLayer.fill(39, 0, 0, w, 1);
-        this.groundLayer.fill(1, 0, h - 1, w, 1);
-        this.groundLayer.fill(21, 0, 0, 1, h);
-        this.groundLayer.fill(19, w - 1, 0, 1, h);
-        this.groundLayer.putTileAt(3, 0, 0);
-        this.groundLayer.putTileAt(4, w - 1, 0);
-        this.groundLayer.putTileAt(23, w - 1, h - 1);
-        this.groundLayer.putTileAt(22, 0, h - 1);
+        // Draw boundary walls
+        this.groundLayer.fill(39, 0, 0, w, 1);               // Top
+        this.groundLayer.fill(1, 0, h - 1, w, 1);            // Bottom
+        this.groundLayer.fill(21, 0, 0, 1, h);               // Left
+        this.groundLayer.fill(19, w - 1, 0, 1, h);           // Right
+        this.groundLayer.putTileAt(3, 0, 0);                 // Top-left corner
+        this.groundLayer.putTileAt(4, w - 1, 0);             // Top-right
+        this.groundLayer.putTileAt(23, w - 1, h - 1);        // Bottom-right
+        this.groundLayer.putTileAt(22, 0, h - 1);            // Bottom-left
 
+        // Random floor tiles
         this.groundLayer.weightedRandomize([
             { index: 6, weight: 4 },
             { index: 7, weight: 1 },
@@ -155,6 +192,7 @@ class GameScene extends Phaser.Scene {
             { index: 26, weight: 1 }
         ], 1, 1, w - 2, h - 2);
 
+        // Random props on the floor (pots, crates, etc.)
         this.objectLayer.weightedRandomize([
             { index: -1, weight: 50 },
             { index: 13, weight: 3 },
@@ -169,6 +207,7 @@ class GameScene extends Phaser.Scene {
     }
 }
 
+// === Phaser Game Configuration and Launch ===
 const config = {
     type: Phaser.WEBGL,
     width: 800,
@@ -178,7 +217,7 @@ const config = {
     backgroundColor: '#000000'
 };
 
-new Phaser.Game(config);
+new Phaser.Game(config); // Start the game
 </script>
 </body>
 </html>
