@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Phaser Multiplayer Tag</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; margin: auto; }
+  </style>
+</head>
+<body>
+<script type="text/javascript">
+class GameScene extends Phaser.Scene {
+    constructor() {
+        super('GameScene');
+    }
+
+    preload() {
+        this.load.setBaseURL('https://cdn.phaserfiles.com/v385');
+        this.load.image('tiles', 'assets/tilemaps/tiles/buch-dungeon-tileset.png');
+    }
+
+    create() {
+        this.tileSize = 16;
+        const mapWidth = 23, mapHeight = 17;
+
+        this.map = this.make.tilemap({ tileWidth: this.tileSize, tileHeight: this.tileSize, width: mapWidth, height: mapHeight });
+        const tiles = this.map.addTilesetImage('tiles');
+
+        this.groundLayer = this.map.createBlankLayer('Ground', tiles).setScale(2);
+        this.objectLayer = this.map.createBlankLayer('Objects', tiles).setScale(2);
+        this.cameras.main.setScroll(-27, -27);
+
+        this.randomizeRoom();
+
+        this.socket = io();
+        this.players = {};
+        this.myID = null;
+        this.isIt = false;
+
+        const spawnX = Phaser.Math.Between(2, mapWidth - 3) * this.tileSize * 2;
+        const spawnY = Phaser.Math.Between(2, mapHeight - 3) * this.tileSize * 2;
+        this.player = this.add.rectangle(spawnX, spawnY, 32, 32, 0x00ff00);
+
+        this.socket.emit("move", { x: this.player.x, y: this.player.y });
+
+        this.socket.on("init", (data) => {
+            this.myID = data.id;
+            this.isIt = data.players[this.myID].it;
+            this.updatePlayerColor();
+
+            for (let id in data.players) {
+                if (id !== this.myID) {
+                    const p = data.players[id];
+                    const color = p.it ? 0xff0000 : 0x0000ff;
+                    this.players[id] = this.add.rectangle(p.x, p.y, 32, 32, color);
+                }
+            }
+        });
+
+        this.socket.on("playerJoined", (data) => {
+            const color = data.it ? 0xff0000 : 0x0000ff;
+            this.players[data.id] = this.add.rectangle(data.x, data.y, 32, 32, color);
+        });
+
+        this.socket.on("playerMoved", (data) => {
+            if (data.id === this.myID) return;
+            const player = this.players[data.id];
+            if (!player) {
+                this.players[data.id] = this.add.rectangle(data.x, data.y, 32, 32, 0x0000ff);
+            } else {
+                player.x = data.x;
+                player.y = data.y;
+            }
+        });
+
+        this.socket.on("playerLeft", (data) => {
+            if (this.players[data.id]) {
+                this.players[data.id].destroy();
+                delete this.players[data.id];
+            }
+        });
+
+        this.socket.on("tagUpdate", (data) => {
+            const { newIt, prevIt } = data;
+            if (newIt === this.myID) {
+                this.isIt = true;
+                this.updatePlayerColor();
+            } else if (prevIt === this.myID) {
+                this.isIt = false;
+                this.updatePlayerColor();
+            }
+
+            if (this.players[newIt]) {
+                this.players[newIt].setFillStyle(0xff0000); // new "it" in red
+            }
+            if (this.players[prevIt]) {
+                this.players[prevIt].setFillStyle(0x0000ff); // no longer "it"
+            }
+        });
+
+        this.cursors = this.input.keyboard.createCursorKeys();
+    }
+
+    update() {
+        let moved = false;
+        const speed = 2;
+
+        if (this.cursors.left.isDown) { this.player.x -= speed; moved = true; }
+        if (this.cursors.right.isDown) { this.player.x += speed; moved = true; }
+        if (this.cursors.up.isDown) { this.player.y -= speed; moved = true; }
+        if (this.cursors.down.isDown) { this.player.y += speed; moved = true; }
+
+        if (moved && this.socket) {
+            this.socket.emit("move", { x: this.player.x, y: this.player.y });
+        }
+
+        if (this.isIt) {
+            for (let id in this.players) {
+                const other = this.players[id];
+                if (!other) continue;
+
+                const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, other.x, other.y);
+                if (dist < 32) {
+                    this.socket.emit("tag", { id });
+                }
+            }
+        }
+    }
+
+    updatePlayerColor() {
+        const color = this.isIt ? 0xff0000 : 0x00ff00;
+        this.player.setFillStyle(color);
+    }
+
+    randomizeRoom() {
+        const w = this.map.width;
+        const h = this.map.height;
+
+        this.groundLayer.fill(39, 0, 0, w, 1);
+        this.groundLayer.fill(1, 0, h - 1, w, 1);
+        this.groundLayer.fill(21, 0, 0, 1, h);
+        this.groundLayer.fill(19, w - 1, 0, 1, h);
+        this.groundLayer.putTileAt(3, 0, 0);
+        this.groundLayer.putTileAt(4, w - 1, 0);
+        this.groundLayer.putTileAt(23, w - 1, h - 1);
+        this.groundLayer.putTileAt(22, 0, h - 1);
+
+        this.groundLayer.weightedRandomize([
+            { index: 6, weight: 4 },
+            { index: 7, weight: 1 },
+            { index: 8, weight: 1 },
+            { index: 26, weight: 1 }
+        ], 1, 1, w - 2, h - 2);
+
+        this.objectLayer.weightedRandomize([
+            { index: -1, weight: 50 },
+            { index: 13, weight: 3 },
+            { index: 32, weight: 2 },
+            { index: 127, weight: 1 },
+            { index: 108, weight: 1 },
+            { index: 109, weight: 2 },
+            { index: 110, weight: 2 },
+            { index: 166, weight: 0.25 },
+            { index: 167, weight: 0.25 }
+        ], 1, 1, w - 2, h - 2);
+    }
+}
+
+const config = {
+    type: Phaser.WEBGL,
+    width: 800,
+    height: 600,
+    scene: GameScene,
+    pixelArt: true,
+    backgroundColor: '#000000'
+};
+
+new Phaser.Game(config);
+</script>
+</body>
+</html>
