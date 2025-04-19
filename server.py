@@ -2,11 +2,22 @@ from flask import Flask, send_from_directory, abort
 from flask_socketio import SocketIO
 from db.database import users, sessions, login_attempts, stats
 from util.backend.logger import log_request, log_raw_http
+# For authentication
+from util.backend.authentication.auth import register, login, logout
 
 app = Flask(__name__)
 app.after_request(log_request)
 app.after_request(log_raw_http)
 socketio = SocketIO(app, cors_allowed_origins="*")  # change this to cors_allowed_origins=["https://website_name"] when we're actually in production
+
+# For authentication.
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev_secret_key")
+
+app.post("/register")(register)
+app.post("/login")(login)
+app.get("/logout")(logout)
+
+
 
 @app.post('/register')
 def register():
