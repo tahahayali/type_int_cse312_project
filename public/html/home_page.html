@@ -2,9 +2,73 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tag Royale</title>
+    <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
+    <div class="container">
+        <header>
+            <h1>Tag Royale</h1>
+            <p>A real-time multiplayer tag game</p>
+        </header>
 
+        <div class="auth-container">
+            <div class="auth-section" id="login-section">
+                <h2>Login</h2>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-username">Username</label>
+                        <input type="text" id="login-username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn">Login</button>
+                </form>
+                <p id="login-message" class="message"></p>
+            </div>
+
+            <div class="auth-section" id="register-section">
+                <h2>Register</h2>
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="register-username">Username</label>
+                        <input type="text" id="register-username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" name="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-confirm-password">Confirm Password</label>
+                        <input type="password" id="register-confirm-password" name="confirm-password" required>
+                    </div>
+                    <button type="submit" class="btn">Register</button>
+                </form>
+                <p id="register-message" class="message"></p>
+            </div>
+        </div>
+
+        <div id="user-info" style="display: none;">
+            <h2>Welcome, <span id="username-display"></span>!</h2>
+            <button id="logout-btn" class="btn">Logout</button>
+            <button id="play-btn" class="btn btn-primary">Play Tag Royale</button>
+        </div>
+
+        <div id="game-container" style="display: none;">
+            <h2>Game will appear here</h2>
+            <div id="game-canvas" class="game-placeholder">
+                <p>This is where the Phaser game will be loaded</p>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2025 Tag Royale - CSE 312 Project</p>
+        </footer>
+    </div>
+
+    <script src="/js/main.js"></script>
 </body>
 </html>

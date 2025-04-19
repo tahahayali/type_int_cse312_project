@@ -12,9 +12,8 @@ services:
 
   mongo:
     image: mongo
-    # Remove the port mapping for security
-    # ports:
-    #   - "27017:27017"
+    ports:
+      - "27017:27017"
     volumes:
       - mongo-data:/data/db
 
