@@ -2,3 +2,6 @@ flask
 flask-socketio
 pymongo
 eventlet
+bcrypt
+requests
+pyotp
