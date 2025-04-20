@@ -135,11 +135,11 @@
 
 import os
 import bcrypt
-import PyJWT as pyjwt
 from datetime import datetime, timedelta, timezone
 from flask import request, jsonify, make_response
 from db.database import users, sessions
 from util.backend.logger import log_auth_attempt
+import jwt as pyjwt
 
 # Secret key for JWTs (set via environment in production)
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev_secret_key")

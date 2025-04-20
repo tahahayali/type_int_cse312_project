@@ -2,7 +2,7 @@ import os
 
 from flask import Flask, send_from_directory, abort
 from flask_socketio import SocketIO
-from db.database import users, sessions, login_attempts, stats
+# from db.database import users, sessions, login_attempts, stats
 from util.backend.logger import log_request, log_raw_http
 # For authentication
 from util.backend.authentication.auth import register, login, logout
