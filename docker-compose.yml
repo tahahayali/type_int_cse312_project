@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   web:
     build:
@@ -7,6 +9,7 @@ services:
       - "8080:8080"
     volumes:
       - ./logs:/app/logs
+      - ./static/avatars:/app/static/avatars
     depends_on:
       - mongo
 

@@ -7,6 +7,9 @@ from util.backend.logger import log_request, log_raw_http
 # For authentication
 from util.backend.authentication.auth import register, login, logout, token_required
 
+# For avatar uploads
+from util.backend.upload.avatar import upload_avatar
+
 app = Flask(__name__)
 app.after_request(log_request)
 app.after_request(log_raw_http)
@@ -37,6 +40,15 @@ def logout_route():
 @app.route('/game')
 def game():
     return send_from_directory("public/html", "game.html")
+
+@app.post("/upload_avatar")
+def avatar_upload_route():
+    return upload_avatar()
+
+@app.route('/static/avatars/<filename>')
+def serve_avatar(filename):
+    return send_from_directory('static/avatars', filename)
+
 
 @app.route('/api/current-user')
 @token_required
