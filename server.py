@@ -1,11 +1,11 @@
 import os
 
-from flask import Flask, send_from_directory, abort
+from flask import Flask, send_from_directory, abort, g, jsonify
 from flask_socketio import SocketIO
 # from db.database import users, sessions, login_attempts, stats
 from util.backend.logger import log_request, log_raw_http
 # For authentication
-from util.backend.authentication.auth import register, login, logout
+from util.backend.authentication.auth import register, login, logout, token_required
 
 app = Flask(__name__)
 app.after_request(log_request)
@@ -38,7 +38,11 @@ def logout_route():
 def game():
     return send_from_directory("public/html", "game.html")
 
-
+@app.route('/api/current-user')
+@token_required
+def current_user():
+    """Return information about the currently logged-in user"""
+    return jsonify({"username": g.username})
 @app.route('/')
 def index():
     return send_from_directory("public/html", "home_page.html")

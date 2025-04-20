@@ -212,7 +212,8 @@ def login():
     resp.set_cookie(
         "auth_token", token,
         httponly=True,
-        samesite='Strict'
+        samesite='Strict',
+        max_age=TOKEN_EXP_HOURS * 3600  # Convert hours to seconds
     )
     return resp, 200
 
@@ -241,6 +242,7 @@ def logout():
             break
 
     resp = make_response(jsonify(message="Logout successful"))
+    resp.set_cookie("auth_token", "", expires=0, max_age=0)
     resp.delete_cookie("auth_token")
     return resp, 200
 
@@ -250,6 +252,7 @@ def token_required(fn):
     Decorator to protect routes: checks for valid JWT cookie and session.
     """
     from functools import wraps
+    from flask import g
 
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -276,6 +279,7 @@ def token_required(fn):
             return jsonify(error="Invalid session"), 401
 
         # Attach username to request context if needed
+        g.username = username  # Store username in Flask's g object
         return fn(*args, **kwargs)
 
     return wrapper

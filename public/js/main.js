@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event Listeners
     loginForm.addEventListener('submit', handleLogin);
     registerForm.addEventListener('submit', handleRegister);
-    logoutBtn.addEventListener('submit', handleLogout);
+    logoutBtn.addEventListener('click', handleLogout);
     playBtn.addEventListener('click', startGame);
 
     // Functions
@@ -40,7 +40,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 loginMessage.textContent = 'Login successful!';
                 loginMessage.className = 'message success';
-                showUserInfo(username);
+                // showUserInfo(username);
+                checkAuthStatus();
             } else {
                 loginMessage.textContent = data.error || 'Login failed';
                 loginMessage.className = 'message error';
@@ -108,19 +109,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function checkAuthStatus() {
+    async function checkAuthStatus()
+    {
         try {
-            // This is a placeholder - you might need to implement a /check-auth endpoint
-            // For now, we'll just check if there's a username cookie or similar
-            const authCookie = document.cookie.includes('auth');
+            // Call our API endpoint to get current user info
+            const response = await fetch('/api/current-user');
 
-            if (authCookie) {
-                // For testing, just show the user as logged in
-                showUserInfo('TestUser');
+            if (response.ok) {
+                // User is authenticated
+                const userData = await response.json();
+                showUserInfo(userData.username);
             } else {
+                // User is not authenticated
                 showLoginRegister();
             }
-
         } catch (error) {
             console.error('Auth check error:', error);
             showLoginRegister();
@@ -143,5 +145,6 @@ document.addEventListener('DOMContentLoaded', function() {
         gameContainer.style.display = 'block';
         // Here you would initialize your Phaser game
         console.log('Starting game...');
+        window.location.href = '/game';
     }
 });
