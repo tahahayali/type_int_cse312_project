@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, send_from_directory, abort
 from flask_socketio import SocketIO
 from db.database import users, sessions, login_attempts, stats
@@ -13,23 +15,23 @@ socketio = SocketIO(app, cors_allowed_origins="*")  # change this to cors_allowe
 # For authentication.
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev_secret_key")
 
-app.post("/register")(register)
-app.post("/login")(login)
-app.get("/logout")(logout)
+# app.post("/register")(register)
+# app.post("/login")(login)
+# app.get("/logout")(logout)
 
 
 
 @app.post('/register')
-def register():
-    pass
+def register_route():
+    return register()
 
 @app.post('/login')
-def login():
-    pass
+def login_route():
+    return login()
 
 @app.get('/logout')
-def logout():
-    pass
+def logout_route():
+    return logout()
 
 
 @app.route('/game')

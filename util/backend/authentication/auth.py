@@ -135,7 +135,7 @@
 
 import os
 import bcrypt
-import jwt
+import PyJWT as pyjwt
 from datetime import datetime, timedelta, timezone
 from flask import request, jsonify, make_response
 from db.database import users, sessions
@@ -195,8 +195,7 @@ def login():
     # Generate JWT token
     exp = datetime.utcnow() + timedelta(hours=TOKEN_EXP_HOURS)
     payload = {"username": username, "exp": exp}
-    token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-
+    token = pyjwt.encode(payload, SECRET_KEY, algorithm="HS256")
     # Store only a bcrypt-hash of the token in the sessions collection
     token_hash = bcrypt.hashpw(token.encode('utf-8'), bcrypt.gensalt())
     sessions.insert_one({
@@ -228,11 +227,11 @@ def logout():
 
     # Decode token to get username
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        payload = pyjwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         username = payload.get("username")
-    except jwt.ExpiredSignatureError:
+    except pyjwt.ExpiredSignatureError:
         return jsonify(error="Session expired"), 401
-    except jwt.InvalidTokenError:
+    except pyjwt.InvalidTokenError:
         return jsonify(error="Invalid token"), 401
 
     # Find matching session and remove it
@@ -260,10 +259,10 @@ def token_required(fn):
 
         # Verify JWT signature and expiration
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        except jwt.ExpiredSignatureError:
+            payload = pyjwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        except pyjwt.ExpiredSignatureError:
             return jsonify(error="Session expired"), 401
-        except jwt.InvalidTokenError:
+        except pyjwt.InvalidTokenError:
             return jsonify(error="Invalid token"), 401
 
         # Verify token hash exists in DB
