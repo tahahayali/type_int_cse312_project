@@ -40,7 +40,12 @@ def register():
     return jsonify(message="Registration successful"), 201
 
 
+
+
 def login():
+
+
+
     """
     Handles user login. Expects JSON with 'username' and 'password'.
     Issues a JWT and sets it as HttpOnly cookie if credentials valid.
