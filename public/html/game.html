@@ -3,19 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <title>Phaser Multiplayer Tag</title>
-  <!-- Load Phaser and Socket.IO libraries -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <style>
-    body { margin: 0; }
-    canvas { display: block; margin: auto; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+    }
   </style>
 </head>
 <body>
 <script type="text/javascript">
 class GameScene extends Phaser.Scene {
     constructor() {
-        super('GameScene'); // Unique name for this scene
+        super('GameScene');
     }
 
     preload() {
@@ -23,87 +35,82 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
-        this.tileSize = 16; // Each tile is 16x16 pixels
-        const mapWidth = 23, mapHeight = 17;
+        this.tileSize = 16;
+        this.scaleFactor = 3;
+        const mapWidth = 60, mapHeight = 40;
 
-        // Create a blank tilemap and add tileset to it
-        this.map = this.make.tilemap({ tileWidth: this.tileSize, tileHeight: this.tileSize, width: mapWidth, height: mapHeight });
+        this.map = this.make.tilemap({
+            tileWidth: this.tileSize,
+            tileHeight: this.tileSize,
+            width: mapWidth,
+            height: mapHeight
+        });
         const tiles = this.map.addTilesetImage('tiles');
 
-        // Create ground and object layers and scale them for visibility
-        this.groundLayer = this.map.createBlankLayer('Ground', tiles).setScale(2);
-        this.objectLayer = this.map.createBlankLayer('Objects', tiles).setScale(2);
+        this.groundLayer = this.map.createBlankLayer('Ground', tiles).setScale(this.scaleFactor);
+        this.objectLayer = this.map.createBlankLayer('Objects', tiles).setScale(this.scaleFactor);
 
-        // Adjust camera scroll to center the map
-        this.cameras.main.setScroll(-27, -27);
-
-        // Randomly decorate the room with tiles
         this.randomizeRoom();
+        this.blockedTiles = new Set();
+        this.recordBlockedTiles();
 
-        // === Set up WebSocket and player state ===
-        this.socket = io();         // Connect to WebSocket server (same origin)
-        this.players = {};          // Tracks all other players
-        this.myID = null;           // This client’s unique socket ID
-        this.isIt = false;          // Whether this player is currently "it"
+        this.socket = io();
+        this.players = {};
+        this.myID = null;
+        this.isIt = false;
 
-        // === Create the local player ===
-        const spawnX = Phaser.Math.Between(2, mapWidth - 3) * this.tileSize * 2;
-        const spawnY = Phaser.Math.Between(2, mapHeight - 3) * this.tileSize * 2;
-        this.player = this.add.rectangle(spawnX, spawnY, 32, 32, 0x00ff00); // Green box = self
+        const spawn = this.getSafeSpawn(mapWidth, mapHeight);
+        this.player = this.add.circle(spawn.x, spawn.y, 16, 0x00ff00); // 🟢 Circle player, 32px diameter
+        this.lastX = this.player.x;
+        this.lastY = this.player.y;
 
-        // Notify server of initial position
+        this.cameras.main.startFollow(this.player);
+        this.cameras.main.setBounds(
+            0, 0,
+            this.map.width * this.tileSize * this.scaleFactor,
+            this.map.height * this.tileSize * this.scaleFactor
+        );
+
         this.socket.emit("move", { x: this.player.x, y: this.player.y });
 
-        // === Server tells us the current game state ===
         this.socket.on("init", (data) => {
             this.myID = data.id;
             this.isIt = data.players[this.myID].it;
-            this.updatePlayerColor(); // Red if "it", green if not
-
-            // Create other players
+            this.updatePlayerColor();
             for (let id in data.players) {
                 if (id !== this.myID) {
                     const p = data.players[id];
-                    const color = p.it ? 0xff0000 : 0x0000ff; // Red if "it", blue otherwise
-                    this.players[id] = this.add.rectangle(p.x, p.y, 32, 32, color);
+                    const color = p.it ? 0xff0000 : 0x0000ff;
+                    this.players[id] = this.add.circle(p.x, p.y, 16, color);
                 }
             }
         });
 
-        // === Server tells us a new player joined ===
         this.socket.on("playerJoined", (data) => {
             const color = data.it ? 0xff0000 : 0x0000ff;
-            this.players[data.id] = this.add.rectangle(data.x, data.y, 32, 32, color);
+            this.players[data.id] = this.add.circle(data.x, data.y, 16, color);
         });
 
-        // === Server tells us someone moved ===
         this.socket.on("playerMoved", (data) => {
-            if (data.id === this.myID) return; // Ignore our own moves
-
+            if (data.id === this.myID) return;
             const player = this.players[data.id];
             if (!player) {
-                // If new player, add them
-                this.players[data.id] = this.add.rectangle(data.x, data.y, 32, 32, 0x0000ff);
+                this.players[data.id] = this.add.circle(data.x, data.y, 16, 0x0000ff);
             } else {
-                // Update position
                 player.x = data.x;
                 player.y = data.y;
             }
         });
 
-        // === Server tells us a player left ===
         this.socket.on("playerLeft", (data) => {
             if (this.players[data.id]) {
-                this.players[data.id].destroy(); // Remove sprite
-                delete this.players[data.id];     // Clean up
+                this.players[data.id].destroy();
+                delete this.players[data.id];
             }
         });
 
-        // === Server notifies a tag happened ===
         this.socket.on("tagUpdate", (data) => {
             const { newIt, prevIt } = data;
-
-            // Update local player's status
             if (newIt === this.myID) {
                 this.isIt = true;
                 this.updatePlayerColor();
@@ -111,76 +118,78 @@ class GameScene extends Phaser.Scene {
                 this.isIt = false;
                 this.updatePlayerColor();
             }
-
-            // Update visuals for other players
-            if (this.players[newIt]) {
-                this.players[newIt].setFillStyle(0xff0000); // Red = "it"
-            }
-            if (this.players[prevIt]) {
-                this.players[prevIt].setFillStyle(0x0000ff); // Blue = no longer "it"
-            }
+            if (this.players[newIt]) this.players[newIt].setFillStyle(0xff0000);
+            if (this.players[prevIt]) this.players[prevIt].setFillStyle(0x0000ff);
         });
 
-        // Setup keyboard input
         this.cursors = this.input.keyboard.createCursorKeys();
     }
 
     update() {
+        const speed = 2.2;
+        const tileSize = this.tileSize * this.scaleFactor;
+        let moveX = 0, moveY = 0;
+
+        if (this.cursors.left.isDown) moveX = -speed;
+        else if (this.cursors.right.isDown) moveX = speed;
+        if (this.cursors.up.isDown) moveY = -speed;
+        else if (this.cursors.down.isDown) moveY = speed;
+
+        const newX = this.player.x + moveX;
+        const newY = this.player.y + moveY;
+
+        const tileX_current = Math.floor(this.player.x / tileSize);
+        const tileY_current = Math.floor(this.player.y / tileSize);
+        const tileX_new = Math.floor(newX / tileSize);
+        const tileY_new = Math.floor(newY / tileSize);
+
+        const blockedX = this.blockedTiles.has(`${tileX_new},${tileY_current}`);
+        const blockedY = this.blockedTiles.has(`${tileX_current},${tileY_new}`);
+
         let moved = false;
-        const speed = 2;
 
-        // === Handle movement input ===
-        if (this.cursors.left.isDown) { this.player.x -= speed; moved = true; }
-        if (this.cursors.right.isDown) { this.player.x += speed; moved = true; }
-        if (this.cursors.up.isDown) { this.player.y -= speed; moved = true; }
-        if (this.cursors.down.isDown) { this.player.y += speed; moved = true; }
+        if (!blockedX) {
+            this.player.x = newX;
+            moved = true;
+        }
 
-        // === Emit movement to server ===
-        if (moved && this.socket) {
+        if (!blockedY) {
+            this.player.y = newY;
+            moved = true;
+        }
+
+        if (moved) {
             this.socket.emit("move", { x: this.player.x, y: this.player.y });
         }
 
-        // === Check for tag collisions if we are "it" ===
         if (this.isIt) {
             for (let id in this.players) {
                 const other = this.players[id];
                 if (!other) continue;
-
-                const dist = Phaser.Math.Distance.Between(
-                    this.player.x, this.player.y,
-                    other.x, other.y
-                );
-
-                // If player is within tag range
-                if (dist < 32) {
-                    this.socket.emit("tag", { id });
-                }
+                const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, other.x, other.y);
+                if (dist < 32) this.socket.emit("tag", { id });
             }
         }
     }
 
-    // === Updates the local player's color based on "it" status ===
+
     updatePlayerColor() {
         const color = this.isIt ? 0xff0000 : 0x00ff00;
         this.player.setFillStyle(color);
     }
 
-    // === Randomly decorate the room using weighted tile placement ===
     randomizeRoom() {
         const w = this.map.width;
         const h = this.map.height;
+        this.groundLayer.fill(39, 0, 0, w, 1);
+        this.groundLayer.fill(1, 0, h - 1, w, 1);
+        this.groundLayer.fill(21, 0, 0, 1, h);
+        this.groundLayer.fill(19, w - 1, 0, 1, h);
+        this.groundLayer.putTileAt(3, 0, 0);
+        this.groundLayer.putTileAt(4, w - 1, 0);
+        this.groundLayer.putTileAt(23, w - 1, h - 1);
+        this.groundLayer.putTileAt(22, 0, h - 1);
 
-        // Draw boundary walls
-        this.groundLayer.fill(39, 0, 0, w, 1);               // Top
-        this.groundLayer.fill(1, 0, h - 1, w, 1);            // Bottom
-        this.groundLayer.fill(21, 0, 0, 1, h);               // Left
-        this.groundLayer.fill(19, w - 1, 0, 1, h);           // Right
-        this.groundLayer.putTileAt(3, 0, 0);                 // Top-left corner
-        this.groundLayer.putTileAt(4, w - 1, 0);             // Top-right
-        this.groundLayer.putTileAt(23, w - 1, h - 1);        // Bottom-right
-        this.groundLayer.putTileAt(22, 0, h - 1);            // Bottom-left
-
-        // Random floor tiles
         this.groundLayer.weightedRandomize([
             { index: 6, weight: 4 },
             { index: 7, weight: 1 },
@@ -188,7 +197,6 @@ class GameScene extends Phaser.Scene {
             { index: 26, weight: 1 }
         ], 1, 1, w - 2, h - 2);
 
-        // Random props on the floor (pots, crates, etc.)
         this.objectLayer.weightedRandomize([
             { index: -1, weight: 50 },
             { index: 13, weight: 3 },
@@ -201,19 +209,57 @@ class GameScene extends Phaser.Scene {
             { index: 167, weight: 0.25 }
         ], 1, 1, w - 2, h - 2);
     }
+
+    recordBlockedTiles() {
+        this.blockedTiles.clear();
+        const w = this.map.width, h = this.map.height;
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const tile = this.objectLayer.getTileAt(x, y);
+                if (!tile) continue;
+                const blockIndexes = [13, 32, 127, 108, 109, 110, 166, 167];
+                if (blockIndexes.includes(tile.index)) {
+                    this.blockedTiles.add(`${x},${y}`);
+                }
+            }
+        }
+        for (let x = 0; x < w; x++) {
+            this.blockedTiles.add(`${x},0`);
+            this.blockedTiles.add(`${x},${h - 1}`);
+        }
+        for (let y = 0; y < h; y++) {
+            this.blockedTiles.add(`0,${y}`);
+            this.blockedTiles.add(`${w - 1},${y}`);
+        }
+    }
+
+    getSafeSpawn(mapWidth, mapHeight) {
+        let spawnX, spawnY, tileX, tileY;
+        const tileSize = this.tileSize * this.scaleFactor;
+        do {
+            spawnX = Phaser.Math.Between(2, mapWidth - 3) * tileSize;
+            spawnY = Phaser.Math.Between(2, mapHeight - 3) * tileSize;
+            tileX = Math.floor(spawnX / tileSize);
+            tileY = Math.floor(spawnY / tileSize);
+        } while (this.blockedTiles.has(`${tileX},${tileY}`));
+        return { x: spawnX, y: spawnY };
+    }
 }
 
-// === Phaser Game Configuration and Launch ===
 const config = {
-    type: Phaser.WEBGL,
-    width: 800,
-    height: 600,
-    scene: GameScene,
+    type: Phaser.AUTO,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: '#111',
     pixelArt: true,
-    backgroundColor: '#000000'
+    scene: GameScene,
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    }
 };
 
-new Phaser.Game(config); // Start the game
+new Phaser.Game(config);
 </script>
 </body>
 </html>
