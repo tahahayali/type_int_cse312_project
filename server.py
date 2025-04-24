@@ -1,5 +1,7 @@
-import os
+import eventlet
+eventlet.monkey_patch()
 
+import os
 from flask import Flask, send_from_directory, abort, g, jsonify
 from flask_socketio import SocketIO
 # from db.database import users, sessions, login_attempts, stats
@@ -14,6 +16,7 @@ app = Flask(__name__)
 app.after_request(log_request)
 app.after_request(log_raw_http)
 socketio = SocketIO(app, cors_allowed_origins="*")  # change this to cors_allowed_origins=["https://website_name"] when we're actually in production
+from util.backend import socket_server
 
 # For authentication.
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev_secret_key")
