@@ -19,11 +19,7 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        // Set base URL for asset loading
-        this.load.setBaseURL('https://cdn.phaserfiles.com/v385');
-
-        // Load dungeon tileset image
-        this.load.image('tiles', 'assets/tilemaps/tiles/buch-dungeon-tileset.png');
+        this.load.image('tiles', '/assets/tilemaps/tiles/buch-dungeon-tileset.png');
     }
 
     create() {
