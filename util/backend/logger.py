@@ -2,8 +2,9 @@ import os
 import logging
 from datetime import datetime, timezone
 from flask import request
+# from logging.handlers import RotatingFileHandler
 
-LOG_DIR = "logs"
+LOG_DIR = "."
 os.makedirs(LOG_DIR, exist_ok=True)
 
 REQUEST_LOG_PATH = os.path.join(LOG_DIR, "requests.log")

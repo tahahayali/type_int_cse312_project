@@ -5,7 +5,7 @@ import os
 from flask import Flask, send_from_directory, abort, g, jsonify
 from flask_socketio import SocketIO
 # from db.database import users, sessions, login_attempts, stats
-from util.backend.logger import log_request, log_raw_http
+from util.backend.logger import *
 # For authentication
 from util.backend.authentication.auth import register, login, logout, token_required
 
