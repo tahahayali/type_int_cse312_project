@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 from flask import request
 # from logging.handlers import RotatingFileHandler
 
-# LOG_DIR = "logs"
-LOG_DIR = "." # trying to have the log dir be the root directory
+LOG_DIR = "logs"
+# LOG_DIR = "." # trying to have the log dir be the root directory
 
 os.makedirs(LOG_DIR, exist_ok=True)
 
