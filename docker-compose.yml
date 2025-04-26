@@ -15,8 +15,9 @@ services:
 
   mongo:
     image: mongo
-    ports:
-      - "27017:27017"
+    #commented out cuz security risk jesse told us about
+    #ports:
+    #  - "27017:27017"
     volumes:
       - mongo-data:/data/db
 
