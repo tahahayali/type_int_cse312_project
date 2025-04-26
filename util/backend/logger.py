@@ -44,10 +44,16 @@ def log_auth_attempt(action, username, success, reason=None):
     
     logging.info(log_entry)
 
+# Before we were printing the auth_token in the logs, but that is a security risk.
 def redact_sensitive_headers(headers):
     redacted = {}
     for key, value in headers.items():
-        if "authorization" in key.lower() or "auth_token" in key.lower():
+        lower_key = key.lower()
+        if "authorization" in lower_key:
+            redacted[key] = "[REDACTED]"
+        elif "cookie" in lower_key:
+            redacted[key] = "[REDACTED]"
+        elif "set-cookie" in lower_key:
             redacted[key] = "[REDACTED]"
         else:
             redacted[key] = value
