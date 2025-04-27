@@ -12,7 +12,7 @@ services:
       - ./static/avatars:/app/static/avatars
     depends_on:
       - mongo
-    command: gunicorn --worker-class eventlet -w 1 server:app -b 0.0.0.0:8080  # <--- ADD THIS LINE
+    command: gunicorn --worker-class eventlet -w 1 server:app -b 0.0.0.0:8080
 
   mongo:
     image: mongo

@@ -1,20 +1,20 @@
-FROM python:3.8
+FROM python:3.8-slim
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements file first
-COPY requirements.txt requirements.txt
+# Copy requirements first
+COPY requirements.txt .
 
-# Install dependencies
+# Install app dependencies
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install PyJWT==2.8.0
+# You already installed PyJWT in requirements.txt, no need to separately pip install here
 
-# Copy the rest of the application
+# Copy the rest of the application code
 COPY . .
 
-# Expose the Flask port
+# Expose port 8080 for Flask / Gunicorn
 EXPOSE 8080
 
-# Run the application
-CMD ["python", "server.py"]
+# We will let docker-compose.yml control the startup command (gunicorn with eventlet)
+# So NO CMD here
