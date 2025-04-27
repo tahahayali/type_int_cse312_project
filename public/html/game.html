@@ -54,32 +54,12 @@
       font-family: monospace;
       margin-right: 5px;
     }
-    /* Leaderboard Toggle Button */
-    .leaderboard-toggle {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background-color: #3498db;
-      color: white;
-      padding: 10px 15px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-family: 'Arial', sans-serif;
-      font-size: 16px;
-      border: none;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-      z-index: 1000;
-      transition: background-color 0.3s;
-    }
-    .leaderboard-toggle:hover {
-      background-color: #2980b9;
-    }
   </style>
 </head>
 <body>
   <div id="game-container"></div>
 
-  <!-- DOM-based Leaderboard -->
+  <!-- DOM-based Leaderboard (hidden by default) -->
   <div class="leaderboard" id="leaderboard">
     <div class="leaderboard-header">
       <h2 class="leaderboard-title">LEADERBOARD</h2>
@@ -90,7 +70,7 @@
     </ul>
   </div>
 
-  <button class="leaderboard-toggle" id="leaderboard-toggle">Show Leaderboard</button>
+  <!-- Removed the blue leaderboard-toggle button -->
 
   <!-- Game Controls Info -->
   <div class="game-controls">
@@ -106,25 +86,24 @@
     // Store active player IDs for leaderboard filtering
     let activePlayers = {};
 
-    // DOM Leaderboard Toggle Button
-    const leaderboardToggle = document.getElementById('leaderboard-toggle');
+    // Get reference to leaderboard element
     const leaderboard = document.getElementById('leaderboard');
     const leaderboardList = document.getElementById('leaderboard-list');
-
-    leaderboardToggle.addEventListener('click', () => {
-      const isVisible = leaderboard.classList.contains('visible');
-      if (isVisible) {
-        leaderboard.classList.remove('visible');
-        leaderboardToggle.textContent = 'Show Leaderboard';
-      } else {
-        leaderboard.classList.add('visible');
-        leaderboardToggle.textContent = 'Hide Leaderboard';
-      }
-    });
 
     // Function to receive active player information from the game
     window.updateActivePlayers = function(players) {
       activePlayers = players || {};
+    };
+
+    // Function to toggle leaderboard visibility from game
+    window.toggleDOMLeaderboard = function(visible) {
+      if (leaderboard) {
+        if (visible) {
+          leaderboard.classList.add('visible');
+        } else {
+          leaderboard.classList.remove('visible');
+        }
+      }
     };
 
     // Function that will be called from the game code to update the DOM leaderboard
