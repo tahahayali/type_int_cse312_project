@@ -20,8 +20,12 @@ register_error_handlers(app)
 app.after_request(log_request)
 app.after_request(log_raw_http)
 
+#socketio = SocketIO(app, cors_allowed_origins="*")  # Allow all origins during dev
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
+# --- add these two lines ---
+from util.backend.socket_handlers import init_handlers
+init_handlers(socketio)
 
 from util.backend import socket_server
 
@@ -97,3 +101,4 @@ def fallback(path):
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=8080)
+# ---------------------------

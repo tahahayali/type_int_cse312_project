@@ -1,129 +1,130 @@
-document.addEventListener('DOMContentLoaded', function() {
-    // DOM Elements
-    const loginForm = document.getElementById('login-form');
-    const registerForm = document.getElementById('register-form');
-    const loginMessage = document.getElementById('login-message');
-    const registerMessage = document.getElementById('register-message');
-    const userInfo = document.getElementById('user-info');
-    const usernameDisplay = document.getElementById('username-display');
-    const logoutBtn = document.getElementById('logout-btn');
-    const playBtn = document.getElementById('play-btn');
-    const gameContainer = document.getElementById('game-container');
-    const authContainer = document.querySelector('.auth-container');
+/*  public/js/main.js  */
+document.addEventListener('DOMContentLoaded', () => {
+    // ───── DOM refs ─────
+    const loginForm        = document.getElementById('login-form');
+    const registerForm     = document.getElementById('register-form');
+    const loginMsg         = document.getElementById('login-message');
+    const registerMsg      = document.getElementById('register-message');
+    const userInfoWrapper  = document.getElementById('user-info');
+    const usernameDisplay  = document.getElementById('username-display');
+    const logoutBtn        = document.getElementById('logout-btn');
+    const playBtn          = document.getElementById('play-btn');
+    const authContainer    = document.querySelector('.auth-container');
 
-    // Check if user is already logged in
+    const LS_KEY = 'tag_username';
+
+    /* initial state */
     checkAuthStatus();
 
-    // Event Listeners
-    loginForm.addEventListener('submit', handleLogin);
+    /* ─── listeners ─── */
+    loginForm   .addEventListener('submit', handleLogin);
     registerForm.addEventListener('submit', handleRegister);
-    logoutBtn.addEventListener('click', handleLogout);
-    playBtn.addEventListener('click', startGame);
+    logoutBtn   .addEventListener('click',  handleLogout);
+    playBtn     .addEventListener('click',  startGame);
 
-    // Functions
+    /* ─── handlers ─── */
     async function handleLogin(e) {
         e.preventDefault();
-        const username = document.getElementById('login-username').value;
+        const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
 
         try {
-            const response = await fetch('/login', {
-                method: 'POST',
+            const res  = await fetch('/login', {
+                method : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body   : JSON.stringify({ username, password })
             });
+            const data = await res.json();
 
-            const data = await response.json();
-
-            if (response.ok) {
-                loginMessage.textContent = 'Login successful!';
-                loginMessage.className = 'message success';
+            if (res.ok) {
+                localStorage.setItem(LS_KEY, username);
+                loginMsg.textContent = 'Login successful!';
+                loginMsg.className   = 'message success';
                 checkAuthStatus();
             } else {
-                loginMessage.textContent = data.error || 'Login failed';
-                loginMessage.className = 'message error';
+                loginMsg.textContent = data.error || 'Login failed';
+                loginMsg.className   = 'message error';
             }
-        } catch (error) {
-            loginMessage.textContent = 'An error occurred. Please try again.';
-            loginMessage.className = 'message error';
-            console.error('Login error:', error);
+        } catch (err) {
+            loginMsg.textContent = 'Network error – try again.';
+            loginMsg.className   = 'message error';
+            console.error(err);
         }
     }
 
     async function handleRegister(e) {
         e.preventDefault();
-        const username = document.getElementById('register-username').value;
+        const username = document.getElementById('register-username').value.trim();
         const password = document.getElementById('register-password').value;
-        const confirmPassword = document.getElementById('register-confirm-password').value;
+        const confirm  = document.getElementById('register-confirm-password').value;
 
-        if (password !== confirmPassword) {
-            registerMessage.textContent = 'Passwords do not match!';
-            registerMessage.className = 'message error';
+        if (password !== confirm) {
+            registerMsg.textContent = 'Passwords do not match!';
+            registerMsg.className   = 'message error';
             return;
         }
 
         try {
-            const response = await fetch('/register', {
-                method: 'POST',
+            const res  = await fetch('/register', {
+                method : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body   : JSON.stringify({ username, password })
             });
+            const data = await res.json();
 
-            const data = await response.json();
-
-            if (response.ok) {
-                registerMessage.textContent = 'Registration successful! You can now login.';
-                registerMessage.className = 'message success';
+            if (res.ok) {
+                registerMsg.textContent = 'Registered! Now log in.';
+                registerMsg.className   = 'message success';
                 registerForm.reset();
             } else {
-                registerMessage.textContent = data.error || 'Registration failed';
-                registerMessage.className = 'message error';
+                registerMsg.textContent = data.error || 'Registration failed';
+                registerMsg.className   = 'message error';
             }
-        } catch (error) {
-            registerMessage.textContent = 'An error occurred. Please try again.';
-            registerMessage.className = 'message error';
-            console.error('Registration error:', error);
+        } catch (err) {
+            registerMsg.textContent = 'Network error – try again.';
+            registerMsg.className   = 'message error';
+            console.error(err);
         }
     }
 
     async function handleLogout() {
         try {
-            const response = await fetch('/logout', { method: 'GET' });
-            if (response.ok) showLoginRegister();
-        } catch (error) {
-            console.error('Logout error:', error);
+            await fetch('/logout');
+        } finally {
+            localStorage.removeItem(LS_KEY);
+            showLoginView();
         }
     }
 
     async function checkAuthStatus() {
         try {
-            const response = await fetch('/api/current-user');
-            if (response.ok) {
-                const userData = await response.json();
-                showUserInfo(userData.username);
+            const res = await fetch('/api/current-user');
+            if (res.ok) {
+                const { username } = await res.json();
+                localStorage.setItem(LS_KEY, username);
+                showUserView(username);
             } else {
-                showLoginRegister();
+                showLoginView();
             }
-        } catch (error) {
-            console.error('Auth check error:', error);
-            showLoginRegister();
+        } catch (err) {
+            console.error(err);
+            showLoginView();
         }
     }
 
-    function showUserInfo(username) {
-        authContainer.style.display = 'none';
-        userInfo.style.display = 'block';
+    /* ─── view switches ─── */
+    function showUserView(username) {
+        authContainer      .style.display = 'none';
+        userInfoWrapper    .style.display = 'block';
         usernameDisplay.textContent = username;
     }
-
-    function showLoginRegister() {
-        authContainer.style.display = 'flex';
-        userInfo.style.display = 'none';
-        gameContainer.style.display = 'none';
+    function showLoginView() {
+        authContainer      .style.display = 'flex';
+        userInfoWrapper    .style.display = 'none';
     }
 
+    /* ─── launch game ─── */
     function startGame() {
-        gameContainer.style.display = 'block';
-        window.location.href = '/game';
+        window.location.href = '/game';   // game page will read localStorage
     }
 });
