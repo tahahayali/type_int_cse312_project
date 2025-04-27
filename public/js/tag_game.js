@@ -35,11 +35,34 @@ class GameScene extends Phaser.Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
 
+        // Add leaderboard toggle key
+        this.leaderboardKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L);
+
         /* WebSocket wrapper (hooks into our scene automatically) */
         this.network = new Network(this);
 
         /* we handle RNG + map once we get the first snapshot */
         this.network.socket.on('init', data => this.handleInit(data));
+
+        // Add game instructions
+        const { width, height } = this.game.config;
+        this.add.text(20, 20, 'Use arrow keys to move', {
+            fontSize: '18px',
+            color: '#ffffff',
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        })
+        .setScrollFactor(0)
+        .setDepth(1000);
+
+        this.add.text(20, 60, 'Press L or click button to toggle leaderboard', {
+            fontSize: '18px',
+            color: '#ffffff',
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        })
+        .setScrollFactor(0)
+        .setDepth(1000);
     }
 
     /* first snapshot from server */
@@ -105,6 +128,25 @@ class GameScene extends Phaser.Scene {
                     this.player.x, this.player.y, container.x, container.y
                 );
                 if (dist < 32) this.network.sendTag(id);
+            }
+        }
+
+        // Toggle leaderboard with L key
+        if (Phaser.Input.Keyboard.JustDown(this.leaderboardKey)) {
+            if (this.network && this.leaderboard) {
+                this.network.leaderboardVisible = !this.network.leaderboardVisible;
+                this.network.updateLeaderboardUI();
+                this.leaderboard.toggleButton.setText(
+                    this.network.leaderboardVisible ? "Hide Leaderboard" : "Show Leaderboard"
+                );
+            }
+        }
+
+        // Update leaderboard every 1 second
+        if (this.network && this.network.leaderboardVisible) {
+            if (!this.lastLeaderboardUpdate || Date.now() - this.lastLeaderboardUpdate > 1000) {
+                this.network.requestLeaderboard();
+                this.lastLeaderboardUpdate = Date.now();
             }
         }
     }
