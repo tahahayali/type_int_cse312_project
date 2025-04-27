@@ -17,6 +17,7 @@ from util.backend.authentication.auth import register, login, logout, token_requ
 # For avatar uploads
 from util.backend.upload.avatar import upload_avatar
 
+
 app = Flask(__name__)
 
 # ← ADD THIS HERE, immediately after you’ve done Flask(__name__)
