@@ -24,6 +24,11 @@ export default class Network {
         this.socket.on('playerLeft',     data => this.remove(data));
         this.socket.on('tagUpdate',      data => this.updateTags(data));
         this.socket.on('leaderboardUpdate', data => this.updateLeaderboard(data));
+
+        // Add debugging for socket events
+        this.socket.onAny((event, ...args) => {
+            console.log(`Socket event: ${event}`, args);
+        });
     }
 
     /* ---------- event helpers ---------- */
@@ -32,6 +37,8 @@ export default class Network {
         const me  = data.players[this.myID];
         this.isIt = me.it;
         this.itTimes = data.it_times || {};
+
+        console.log(`Initial state - myID: ${this.myID}, isIt: ${this.isIt}`);
 
         this.scene.player
             .setFillStyle(this.isIt ? 0xff0000 : 0x00ff00)
@@ -60,6 +67,8 @@ export default class Network {
 
         const container = this.scene.add.container(x, y, [circle, label]);
         this.players[id] = { container, circle, label };
+
+        console.log(`Spawned player ${id} at (${x}, ${y}), it: ${it}`);
     }
 
     move({ id, x, y }) {
@@ -76,21 +85,26 @@ export default class Network {
         if (entry) {
             entry.container.destroy(true);
             delete this.players[id];
+            console.log(`Player ${id} removed`);
         }
     }
 
     updateTags({ newIt, prevIt }) {
+        console.log(`Tag update - newIt: ${newIt}, prevIt: ${prevIt}, myID: ${this.myID}`);
+
         /* our own status */
         if (newIt === this.myID) {
             this.isIt = true;
             this.scene.player
                 .setFillStyle(0xff0000)
                 .setStrokeStyle(4, 0xff0000);
+            console.log('I am now IT!');
         } else if (prevIt === this.myID) {
             this.isIt = false;
             this.scene.player
                 .setFillStyle(0x00ff00)
                 .setStrokeStyle(0, 0xff0000);
+            console.log('I am no longer IT!');
         }
 
         /* remote players */
@@ -99,6 +113,7 @@ export default class Network {
             if (p) {
                 p.circle.setFillStyle(0xff0000);
                 p.circle.setStrokeStyle(4, 0xff0000);
+                console.log(`Player ${id} is now IT`);
             }
         };
         const makeNotIt = id => {
@@ -106,10 +121,17 @@ export default class Network {
             if (p) {
                 p.circle.setFillStyle(0x0000ff);
                 p.circle.setStrokeStyle(0, 0xff0000);
+                console.log(`Player ${id} is no longer IT`);
             }
         };
-        makeIt(newIt);
-        makeNotIt(prevIt);
+
+        if (newIt) makeIt(newIt);
+        if (prevIt) makeNotIt(prevIt);
+
+        // Update status text if available
+        if (this.scene.updateStatusText) {
+            this.scene.updateStatusText();
+        }
     }
 
     updateLeaderboard(data) {
@@ -118,9 +140,22 @@ export default class Network {
     }
 
     /* ---------- client → server ---------- */
-    sendMove(x, y) { this.socket.emit('move', { x, y }); }
-    sendTag(id)    { if (this.isIt) this.socket.emit('tag', { id }); }
-    requestLeaderboard() { this.socket.emit('getLeaderboard'); }
+    sendMove(x, y) {
+        this.socket.emit('move', { x, y });
+    }
+
+    sendTag(id) {
+        if (this.isIt) {
+            console.log(`Sending tag event for player ${id}`);
+            this.socket.emit('tag', { id });
+        } else {
+            console.log('Not IT, cannot tag');
+        }
+    }
+
+    requestLeaderboard() {
+        this.socket.emit('getLeaderboard');
+    }
 
     /* ---------- leaderboard UI ---------- */
     createLeaderboardUI() {
@@ -247,11 +282,29 @@ export default class Network {
                 entry.name.setVisible(false);
                 entry.time.setVisible(false);
             });
+
+            // Also update DOM leaderboard visibility
+            const domLeaderboard = document.getElementById('leaderboard');
+            const domToggle = document.getElementById('leaderboard-toggle');
+            if (domLeaderboard && domToggle) {
+                domLeaderboard.classList.remove('visible');
+                domToggle.textContent = 'Show Leaderboard';
+            }
             return;
+        } else {
+            // Update DOM leaderboard visibility
+            const domLeaderboard = document.getElementById('leaderboard');
+            const domToggle = document.getElementById('leaderboard-toggle');
+            if (domLeaderboard && domToggle) {
+                domLeaderboard.classList.add('visible');
+                domToggle.textContent = 'Hide Leaderboard';
+            }
         }
 
         // Format and sort player times
         const sortedPlayers = [];
+        const leaderboardData = {};
+
         for (const id in this.itTimes) {
             const time = this.itTimes[id];
             let totalTime = time.total || 0;
@@ -275,12 +328,19 @@ export default class Network {
                 time: totalTime,
                 isCurrentPlayer: id === this.myID
             });
+
+            // Add to data for DOM leaderboard
+            leaderboardData[id] = {
+                ...time,
+                name,
+                isCurrentPlayer: id === this.myID
+            };
         }
 
         // Sort by time (longest first)
         sortedPlayers.sort((a, b) => b.time - a.time);
 
-        // Update leaderboard entries
+        // Update Phaser leaderboard entries
         entries.forEach((entry, i) => {
             if (i < sortedPlayers.length) {
                 const player = sortedPlayers[i];
@@ -308,5 +368,10 @@ export default class Network {
                 entry.time.setVisible(false);
             }
         });
+
+        // Update DOM leaderboard if available
+        if (window.updateDOMLeaderboard) {
+            window.updateDOMLeaderboard(leaderboardData);
+        }
     }
 }

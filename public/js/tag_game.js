@@ -63,6 +63,42 @@ class GameScene extends Phaser.Scene {
         })
         .setScrollFactor(0)
         .setDepth(1000);
+
+        // Status indicator text
+        this.statusText = this.add.text(20, 100, '', {
+            fontSize: '18px',
+            color: '#ffffff',
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        })
+        .setScrollFactor(0)
+        .setDepth(1000);
+
+        // Connect DOM toggle button to Phaser if it exists
+        const domToggle = document.getElementById('leaderboard-toggle');
+        if (domToggle) {
+            domToggle.addEventListener('click', () => {
+                if (this.network && this.leaderboard) {
+                    this.network.leaderboardVisible = !this.network.leaderboardVisible;
+                    this.network.updateLeaderboardUI();
+                    this.leaderboard.toggleButton.setText(
+                        this.network.leaderboardVisible ? "Hide Leaderboard" : "Show Leaderboard"
+                    );
+
+                    // Also sync with DOM leaderboard
+                    const domLeaderboard = document.getElementById('leaderboard');
+                    if (domLeaderboard) {
+                        if (this.network.leaderboardVisible) {
+                            domLeaderboard.classList.add('visible');
+                            domToggle.textContent = 'Hide Leaderboard';
+                        } else {
+                            domLeaderboard.classList.remove('visible');
+                            domToggle.textContent = 'Show Leaderboard';
+                        }
+                    }
+                }
+            });
+        }
     }
 
     /* first snapshot from server */
@@ -87,6 +123,17 @@ class GameScene extends Phaser.Scene {
             this.map.width  * this.tileSize * this.scaleFactor,
             this.map.height * this.tileSize * this.scaleFactor
         );
+
+        // Set initial status text
+        this.updateStatusText();
+    }
+
+    updateStatusText() {
+        if (this.network.isIt) {
+            this.statusText.setText('You are IT! Tag someone else!').setColor('#ff0000');
+        } else {
+            this.statusText.setText('Run away! Don\'t get tagged!').setColor('#00ff00');
+        }
     }
 
     update() {
@@ -124,10 +171,20 @@ class GameScene extends Phaser.Scene {
                 const other = this.network.players[id];
                 if (!other) continue;
                 const { container } = other;
+
+                // Calculate distance between player and target
                 const dist = Phaser.Math.Distance.Between(
                     this.player.x, this.player.y, container.x, container.y
                 );
-                if (dist < 32) this.network.sendTag(id);
+
+                // If close enough to tag
+                if (dist < 32) {
+                    console.log(`Attempting to tag player ${id}, distance: ${dist}`);
+                    this.network.sendTag(id);
+
+                    // Visual feedback for tag attempt
+                    this.cameras.main.flash(100, 255, 0, 0);
+                }
             }
         }
 
@@ -139,6 +196,19 @@ class GameScene extends Phaser.Scene {
                 this.leaderboard.toggleButton.setText(
                     this.network.leaderboardVisible ? "Hide Leaderboard" : "Show Leaderboard"
                 );
+
+                // Also sync with DOM leaderboard
+                const domLeaderboard = document.getElementById('leaderboard');
+                const domToggle = document.getElementById('leaderboard-toggle');
+                if (domLeaderboard && domToggle) {
+                    if (this.network.leaderboardVisible) {
+                        domLeaderboard.classList.add('visible');
+                        domToggle.textContent = 'Hide Leaderboard';
+                    } else {
+                        domLeaderboard.classList.remove('visible');
+                        domToggle.textContent = 'Show Leaderboard';
+                    }
+                }
             }
         }
 
@@ -153,7 +223,6 @@ class GameScene extends Phaser.Scene {
 
     /* ─── map building (unchanged from before) ─── */
     randomizeRoom() {
-        /* ... keep your existing body exactly as is ... */
         const w = this.map.width, h = this.map.height;
         this.groundLayer.fill(39, 0, 0, w, 1);
         this.groundLayer.fill(1, 0, h - 1, w, 1);
