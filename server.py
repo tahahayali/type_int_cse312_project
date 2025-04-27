@@ -5,7 +5,12 @@ import os
 from flask import Flask, send_from_directory, abort, g, jsonify
 from flask_socketio import SocketIO
 # from db.database import users, sessions, login_attempts, stats
-from util.backend.logger import *
+# bring in your logging utilities
+from util.backend.logger import (
+    log_request,
+    log_raw_http,
+    register_error_handlers
+)
 # For authentication
 from util.backend.authentication.auth import register, login, logout, token_required
 
@@ -13,6 +18,10 @@ from util.backend.authentication.auth import register, login, logout, token_requ
 from util.backend.upload.avatar import upload_avatar
 
 app = Flask(__name__)
+
+# ← ADD THIS HERE, immediately after you’ve done Flask(__name__)
+register_error_handlers(app)
+
 app.after_request(log_request)
 app.after_request(log_raw_http)
 socketio = SocketIO(app, cors_allowed_origins="*")  # change this to cors_allowed_origins=["https://website_name"] when we're actually in production
