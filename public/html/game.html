@@ -5,6 +5,7 @@
   <title>Phaser Multiplayer Tag</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <link rel="stylesheet" href="/css/styles.css">
   <style>
     html, body {
       margin: 0;
@@ -21,10 +22,143 @@
       max-width: 100%;
       max-height: 100%;
     }
+    /* Game controls info */
+    .game-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 5px;
+      font-family: 'Arial', sans-serif;
+      z-index: 1000;
+    }
+    .controls-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .controls-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .controls-list li {
+      margin-bottom: 5px;
+    }
+    .key {
+      display: inline-block;
+      background-color: #333;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      margin-right: 5px;
+    }
   </style>
 </head>
 <body>
   <div id="game-container"></div>
+
+  <!-- DOM-based Leaderboard (hidden by default) -->
+  <div class="leaderboard" id="leaderboard">
+    <div class="leaderboard-header">
+      <h2 class="leaderboard-title">LEADERBOARD</h2>
+      <p class="leaderboard-subtitle">Time spent as 'IT'</p>
+    </div>
+    <ul class="leaderboard-list" id="leaderboard-list">
+      <!-- Leaderboard entries will be inserted here dynamically -->
+    </ul>
+  </div>
+
+  <!-- Removed the blue leaderboard-toggle button -->
+
+  <!-- Game Controls Info -->
+  <div class="game-controls">
+    <div class="controls-title">Controls</div>
+    <ul class="controls-list">
+      <li><span class="key">↑</span><span class="key">←</span><span class="key">↓</span><span class="key">→</span> Move</li>
+      <li><span class="key">L</span> Toggle Leaderboard</li>
+      <li>If you're <span style="color: red; font-weight: bold;">RED</span>, touch others to tag them!</li>
+    </ul>
+  </div>
+
+  <script>
+    // Store active player IDs for leaderboard filtering
+    let activePlayers = {};
+
+    // Get reference to leaderboard element
+    const leaderboard = document.getElementById('leaderboard');
+    const leaderboardList = document.getElementById('leaderboard-list');
+
+    // Function to receive active player information from the game
+    window.updateActivePlayers = function(players) {
+      activePlayers = players || {};
+    };
+
+    // Function to toggle leaderboard visibility from game
+    window.toggleDOMLeaderboard = function(visible) {
+      if (leaderboard) {
+        if (visible) {
+          leaderboard.classList.add('visible');
+        } else {
+          leaderboard.classList.remove('visible');
+        }
+      }
+    };
+
+    // Function that will be called from the game code to update the DOM leaderboard
+    window.updateDOMLeaderboard = function(leaderboardData) {
+      leaderboardList.innerHTML = '';
+
+      const sortedPlayers = [];
+      for (const id in leaderboardData) {
+        // Skip inactive players (except for the current player)
+        if (!leaderboardData[id].isCurrentPlayer && !activePlayers[id]) {
+          continue;
+        }
+
+        const player = leaderboardData[id];
+        let totalTime = player.total || 0;
+
+        // Add current time if player is "it"
+        if (player.started_at) {
+          totalTime += (Date.now() / 1000) - player.started_at;
+        }
+
+        sortedPlayers.push({
+          id,
+          name: player.name || id.slice(0, 4),
+          time: totalTime,
+          isCurrentPlayer: player.isCurrentPlayer
+        });
+      }
+
+      // Sort by time (longest first)
+      sortedPlayers.sort((a, b) => b.time - a.time);
+
+      // Create leaderboard entries
+      sortedPlayers.forEach((player, index) => {
+        const li = document.createElement('li');
+        li.className = 'leaderboard-item';
+        if (player.isCurrentPlayer) {
+          li.classList.add('current-player');
+        }
+
+        // Format time as minutes:seconds
+        const minutes = Math.floor(player.time / 60);
+        const seconds = Math.floor(player.time % 60);
+        const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        li.innerHTML = `
+          <div class="leaderboard-rank">${index + 1}.</div>
+          <div class="leaderboard-name">${player.name}</div>
+          <div class="leaderboard-time">${timeText}</div>
+        `;
+
+        leaderboardList.appendChild(li);
+      });
+    };
+  </script>
 
   <script type="module">
     import './js/tag_game.js';

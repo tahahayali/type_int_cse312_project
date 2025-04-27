@@ -35,11 +35,70 @@ class GameScene extends Phaser.Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
 
+        // Add leaderboard toggle key
+        this.leaderboardKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L);
+
         /* WebSocket wrapper (hooks into our scene automatically) */
         this.network = new Network(this);
 
         /* we handle RNG + map once we get the first snapshot */
         this.network.socket.on('init', data => this.handleInit(data));
+
+        // Add game instructions
+        const { width, height } = this.game.config;
+        this.add.text(20, 20, 'Use arrow keys to move', {
+            fontSize: '18px',
+            color: '#ffffff',
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        })
+        .setScrollFactor(0)
+        .setDepth(1000);
+
+        this.add.text(20, 60, 'Press L or click button to toggle leaderboard', {
+            fontSize: '18px',
+            color: '#ffffff',
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        })
+        .setScrollFactor(0)
+        .setDepth(1000);
+
+        // Status indicator text
+        this.statusText = this.add.text(20, 100, '', {
+            fontSize: '18px',
+            color: '#ffffff',
+            backgroundColor: '#333333',
+            padding: { x: 10, y: 5 }
+        })
+        .setScrollFactor(0)
+        .setDepth(1000);
+
+        // Connect DOM toggle button to Phaser if it exists
+        const domToggle = document.getElementById('leaderboard-toggle');
+        if (domToggle) {
+            domToggle.addEventListener('click', () => {
+                if (this.network && this.leaderboard) {
+                    this.network.leaderboardVisible = !this.network.leaderboardVisible;
+                    this.network.updateLeaderboardUI();
+                    this.leaderboard.toggleButton.setText(
+                        this.network.leaderboardVisible ? "Hide Leaderboard" : "Show Leaderboard"
+                    );
+
+                    // Also sync with DOM leaderboard
+                    const domLeaderboard = document.getElementById('leaderboard');
+                    if (domLeaderboard) {
+                        if (this.network.leaderboardVisible) {
+                            domLeaderboard.classList.add('visible');
+                            domToggle.textContent = 'Hide Leaderboard';
+                        } else {
+                            domLeaderboard.classList.remove('visible');
+                            domToggle.textContent = 'Show Leaderboard';
+                        }
+                    }
+                }
+            });
+        }
     }
 
     /* first snapshot from server */
@@ -64,6 +123,17 @@ class GameScene extends Phaser.Scene {
             this.map.width  * this.tileSize * this.scaleFactor,
             this.map.height * this.tileSize * this.scaleFactor
         );
+
+        // Set initial status text
+        this.updateStatusText();
+    }
+
+    updateStatusText() {
+        if (this.network.isIt) {
+            this.statusText.setText('You are IT! Tag someone else!').setColor('#ff0000');
+        } else {
+            this.statusText.setText('Run away! Don\'t get tagged!').setColor('#00ff00');
+        }
     }
 
     update() {
@@ -101,17 +171,67 @@ class GameScene extends Phaser.Scene {
                 const other = this.network.players[id];
                 if (!other) continue;
                 const { container } = other;
+
+                // Calculate distance between player and target
                 const dist = Phaser.Math.Distance.Between(
                     this.player.x, this.player.y, container.x, container.y
                 );
-                if (dist < 32) this.network.sendTag(id);
+
+                // If close enough to tag
+                if (dist < 32) {
+                    console.log(`Attempting to tag player ${id}, distance: ${dist}`);
+                    this.network.sendTag(id);
+
+                    // Visual feedback for tag attempt - no camera flash
+                    // Just update the player circle with a brief pulse
+                    const originalScale = other.circle.scaleX;
+                    other.circle.setScale(1.5);
+                    this.tweens.add({
+                        targets: other.circle,
+                        scaleX: originalScale,
+                        scaleY: originalScale,
+                        duration: 200,
+                        ease: 'Quad.easeOut'
+                    });
+                }
+            }
+        }
+
+        // Toggle leaderboard with L key
+        if (Phaser.Input.Keyboard.JustDown(this.leaderboardKey)) {
+            if (this.network && this.leaderboard) {
+                this.network.leaderboardVisible = !this.network.leaderboardVisible;
+                this.network.updateLeaderboardUI();
+                this.leaderboard.toggleButton.setText(
+                    this.network.leaderboardVisible ? "Hide Leaderboard" : "Show Leaderboard"
+                );
+
+                // Also sync with DOM leaderboard
+                const domLeaderboard = document.getElementById('leaderboard');
+                const domToggle = document.getElementById('leaderboard-toggle');
+                if (domLeaderboard && domToggle) {
+                    if (this.network.leaderboardVisible) {
+                        domLeaderboard.classList.add('visible');
+                        domToggle.textContent = 'Hide Leaderboard';
+                    } else {
+                        domLeaderboard.classList.remove('visible');
+                        domToggle.textContent = 'Show Leaderboard';
+                    }
+                }
+            }
+        }
+
+        // Update leaderboard every 1 second
+        if (this.network && this.network.leaderboardVisible) {
+            if (!this.lastLeaderboardUpdate || Date.now() - this.lastLeaderboardUpdate > 1000) {
+                this.network.requestLeaderboard();
+                this.lastLeaderboardUpdate = Date.now();
             }
         }
     }
 
     /* ─── map building (unchanged from before) ─── */
     randomizeRoom() {
-        /* ... keep your existing body exactly as is ... */
         const w = this.map.width, h = this.map.height;
         this.groundLayer.fill(39, 0, 0, w, 1);
         this.groundLayer.fill(1, 0, h - 1, w, 1);
