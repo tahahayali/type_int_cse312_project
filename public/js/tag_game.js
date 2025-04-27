@@ -182,8 +182,17 @@ class GameScene extends Phaser.Scene {
                     console.log(`Attempting to tag player ${id}, distance: ${dist}`);
                     this.network.sendTag(id);
 
-                    // Visual feedback for tag attempt
-                    this.cameras.main.flash(100, 255, 0, 0);
+                    // Visual feedback for tag attempt - no camera flash
+                    // Just update the player circle with a brief pulse
+                    const originalScale = other.circle.scaleX;
+                    other.circle.setScale(1.5);
+                    this.tweens.add({
+                        targets: other.circle,
+                        scaleX: originalScale,
+                        scaleY: originalScale,
+                        duration: 200,
+                        ease: 'Quad.easeOut'
+                    });
                 }
             }
         }

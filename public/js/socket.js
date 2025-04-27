@@ -7,6 +7,7 @@ export default class Network {
         this.isIt      = false;
         this.itTimes   = {};  // Store "it" times for leaderboard
         this.leaderboardVisible = false; // Track if leaderboard is visible
+        this.tagCooldown = false; // Prevent rapid tagging
 
         /* include username if we have it */
         const storedName = localStorage.getItem('tag_username') || '';
@@ -50,6 +51,8 @@ export default class Network {
             this.spawn({ id, ...p });
         }
 
+        this.updateActivePlayers();
+
         // Create leaderboard UI if not already created
         if (!this.scene.leaderboard) {
             this.createLeaderboardUI();
@@ -66,9 +69,10 @@ export default class Network {
             .setOrigin(0.5);
 
         const container = this.scene.add.container(x, y, [circle, label]);
-        this.players[id] = { container, circle, label };
+        this.players[id] = { container, circle, label, it: it };
 
         console.log(`Spawned player ${id} at (${x}, ${y}), it: ${it}`);
+        this.updateActivePlayers();
     }
 
     move({ id, x, y }) {
@@ -86,6 +90,8 @@ export default class Network {
             entry.container.destroy(true);
             delete this.players[id];
             console.log(`Player ${id} removed`);
+            this.updateActivePlayers();
+
         }
     }
 
@@ -108,25 +114,19 @@ export default class Network {
         }
 
         /* remote players */
-        const makeIt = id => {
-            const p = this.players[id];
-            if (p) {
-                p.circle.setFillStyle(0xff0000);
-                p.circle.setStrokeStyle(4, 0xff0000);
-                console.log(`Player ${id} is now IT`);
-            }
-        };
-        const makeNotIt = id => {
-            const p = this.players[id];
-            if (p) {
-                p.circle.setFillStyle(0x0000ff);
-                p.circle.setStrokeStyle(0, 0xff0000);
-                console.log(`Player ${id} is no longer IT`);
-            }
-        };
+        if (newIt && this.players[newIt]) {
+            this.players[newIt].it = true;
+            this.players[newIt].circle.setFillStyle(0xff0000);
+            this.players[newIt].circle.setStrokeStyle(4, 0xff0000);
+            console.log(`Player ${newIt} is now IT`);
+        }
 
-        if (newIt) makeIt(newIt);
-        if (prevIt) makeNotIt(prevIt);
+        if (prevIt && this.players[prevIt]) {
+            this.players[prevIt].it = false;
+            this.players[prevIt].circle.setFillStyle(0x0000ff);
+            this.players[prevIt].circle.setStrokeStyle(0, 0xff0000);
+            console.log(`Player ${prevIt} is no longer IT`);
+        }
 
         // Update status text if available
         if (this.scene.updateStatusText) {
@@ -145,11 +145,21 @@ export default class Network {
     }
 
     sendTag(id) {
-        if (this.isIt) {
+        // Only send tag if we're "it" and not on cooldown
+        if (this.isIt && !this.tagCooldown) {
             console.log(`Sending tag event for player ${id}`);
+
+            // Set a brief cooldown to prevent accidental double-tags
+            this.tagCooldown = true;
+            setTimeout(() => {
+                this.tagCooldown = false;
+            }, 500);
+
             this.socket.emit('tag', { id });
-        } else {
+        } else if (!this.isIt) {
             console.log('Not IT, cannot tag');
+        } else {
+            console.log('Tag on cooldown');
         }
     }
 
@@ -267,6 +277,7 @@ export default class Network {
     }
 
     updateLeaderboardUI() {
+        this.updateActivePlayers();
         if (!this.scene.leaderboard) return;
 
         const { toggleButton, background, title, subtitle, entries } = this.scene.leaderboard;
@@ -305,7 +316,13 @@ export default class Network {
         const sortedPlayers = [];
         const leaderboardData = {};
 
+        // Only include active players with non-zero times
         for (const id in this.itTimes) {
+            // Skip players who aren't active (not in players object)
+            if (id !== this.myID && !this.players[id]) {
+                continue;
+            }
+
             const time = this.itTimes[id];
             let totalTime = time.total || 0;
 
@@ -374,4 +391,39 @@ export default class Network {
             window.updateDOMLeaderboard(leaderboardData);
         }
     }
+
+    // Add this function to the socket.js file after the updateLeaderboardUI function
+
+    updateActivePlayers() {
+        // Create a map of active player IDs
+        const activePlayers = {};
+
+        // Add all current players to the active players list
+        for (const id in this.players) {
+            activePlayers[id] = true;
+        }
+
+        // Also add the current player
+        if (this.myID) {
+            activePlayers[this.myID] = true;
+        }
+
+        // Update the DOM with active players if the function exists
+        if (window.updateActivePlayers) {
+            window.updateActivePlayers(activePlayers);
+        }
+    }
+
+    // Then, modify the updateLeaderboardUI function to call this function
+    // Add this call at the beginning of updateLeaderboardUI:
+
+
+    // And add these calls to the handleInit, spawn, and remove functions:
+
+    // In handleInit, after processing players:
+
+    // In spawn, after adding a player:
+
+
+    // In remove, after removing a player:
 }

@@ -24,11 +24,13 @@ def init_handlers(sock):
         is_it = len(players) == 0
 
         players[sid] = dict(x=spawn_x, y=spawn_y, it=is_it, name=username)
-        it_times[sid] = 0  # Initialize "it" time to 0 seconds
+
+        # Initialize "it" time to 0 seconds
+        it_times[sid] = {"total": 0, "started_at": None}
 
         # If this player is "it", set their start time
         if is_it:
-            it_times[sid] = {"total": 0, "started_at": time.time()}
+            it_times[sid]["started_at"] = time.time()
 
         # Include it_times in the init data
         emit('init', {'id': sid, 'seed': MAP_SEED, 'players': players, 'it_times': it_times})
@@ -39,6 +41,7 @@ def init_handlers(sock):
 
         # Send updated leaderboard to all clients
         emit('leaderboardUpdate', {'it_times': it_times}, broadcast=True)
+        print(f"Player connected: {sid}, username: {username}, is_it: {is_it}")
 
     @socketio.on('move')
     def _move(data):
@@ -52,46 +55,79 @@ def init_handlers(sock):
     def _tag(data):
         tagger = request.sid
         target = data.get('id')
-        if tagger in players and target in players and players[tagger]['it']:
-            # Update the time for the previous "it" player
-            if it_times[tagger].get("started_at"):
-                elapsed = time.time() - it_times[tagger]["started_at"]
-                it_times[tagger]["total"] += elapsed
-                it_times[tagger]["started_at"] = None
 
-            # Set the new "it" player's start time
-            if target not in it_times:
-                it_times[target] = {"total": 0, "started_at": time.time()}
-            else:
-                it_times[target]["started_at"] = time.time()
+        # Validate the tag
+        if tagger not in players:
+            print(f"Tag error: Tagger {tagger} not in players list")
+            return
 
-            # Update player states
-            players[tagger]['it'] = False
-            players[target]['it'] = True
+        if target not in players:
+            print(f"Tag error: Target {target} not in players list")
+            return
 
-            # Send tag update
-            emit('tagUpdate',
-                 {'newIt': target, 'prevIt': tagger},
-                 broadcast=True)
+        if not players[tagger]['it']:
+            print(f"Tag error: Tagger {tagger} is not 'it'")
+            return
 
-            # Send updated leaderboard
-            emit('leaderboardUpdate', {'it_times': it_times}, broadcast=True)
+        print(f"Tag event: {tagger} tagged {target}")
+
+        # Update the time for the previous "it" player
+        if tagger in it_times and it_times[tagger].get("started_at"):
+            elapsed = time.time() - it_times[tagger]["started_at"]
+            it_times[tagger]["total"] += elapsed
+            it_times[tagger]["started_at"] = None
+            print(f"Updated 'it' time for {tagger}: +{elapsed:.2f}s, total: {it_times[tagger]['total']:.2f}s")
+
+        # Set the new "it" player's start time
+        if target not in it_times:
+            it_times[target] = {"total": 0, "started_at": time.time()}
+        else:
+            it_times[target]["started_at"] = time.time()
+
+        # Update player states
+        players[tagger]['it'] = False
+        players[target]['it'] = True
+
+        print(f"New 'it' player: {target}")
+
+        # Send tag update to all clients
+        emit('tagUpdate',
+             {'newIt': target, 'prevIt': tagger},
+             broadcast=True)
+
+        # Send updated leaderboard
+        emit('leaderboardUpdate', {'it_times': it_times}, broadcast=True)
 
     @socketio.on('disconnect')
     def _dc():
         sid = request.sid
-        was_it = players.get(sid, {}).get('it', False)
+
+        if sid not in players:
+            print(f"Disconnect for unknown player: {sid}")
+            return
+
+        was_it = players[sid].get('it', False)
+        username = players[sid].get('name', sid[:4])
+        print(f"Player disconnected: {sid}, username: {username}, was_it: {was_it}")
 
         # Update "it" time if the disconnecting player was "it"
         if was_it and sid in it_times and it_times[sid].get("started_at"):
             elapsed = time.time() - it_times[sid]["started_at"]
             it_times[sid]["total"] += elapsed
+            it_times[sid]["started_at"] = None
+            print(f"Final 'it' time for {sid}: +{elapsed:.2f}s, total: {it_times[sid]['total']:.2f}s")
 
+        # Remove player from both dictionaries
         if sid in players:
             del players[sid]
 
+        # Also remove from it_times to keep leaderboard clean
+        if sid in it_times:
+            del it_times[sid]
+
         emit('playerLeft', {'id': sid}, broadcast=True)
 
+        # If they were "it", assign to someone else
         if was_it and players:
             new_it = random.choice(list(players.keys()))
             players[new_it]['it'] = True
@@ -102,11 +138,16 @@ def init_handlers(sock):
             else:
                 it_times[new_it]["started_at"] = time.time()
 
+            print(f"Assigning new 'it' player: {new_it}")
+
             emit('tagUpdate',
                  {'newIt': new_it, 'prevIt': sid},
                  broadcast=True)
 
             # Send updated leaderboard
+            emit('leaderboardUpdate', {'it_times': it_times}, broadcast=True)
+        else:
+            # Always send updated leaderboard after player leaves
             emit('leaderboardUpdate', {'it_times': it_times}, broadcast=True)
 
     # Add a new handler to handle leaderboard requests
@@ -120,4 +161,7 @@ def init_handlers(sock):
                 # Just calculate it but don't update the stored value
                 it_times[sid]["current_total"] = current_total
 
-        emit('leaderboardUpdate', {'it_times': it_times})
+        active_players = {sid: player for sid, player in players.items()}
+        active_it_times = {sid: time_data for sid, time_data in it_times.items() if sid in active_players}
+
+        emit('leaderboardUpdate', {'it_times': active_it_times})
