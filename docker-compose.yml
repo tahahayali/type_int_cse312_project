@@ -12,12 +12,10 @@ services:
       - ./static/avatars:/app/static/avatars
     depends_on:
       - mongo
+    command: gunicorn --worker-class eventlet -w 1 server:app -b 0.0.0.0:8080  # <--- ADD THIS LINE
 
   mongo:
     image: mongo
-    #commented out cuz security risk jesse told us about
-    #ports:
-    #  - "27017:27017"
     volumes:
       - mongo-data:/data/db
 

@@ -20,7 +20,8 @@ register_error_handlers(app)
 app.after_request(log_request)
 app.after_request(log_raw_http)
 
-socketio = SocketIO(app, cors_allowed_origins="*")  # Allow all origins during dev
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+
 
 from util.backend import socket_server
 
