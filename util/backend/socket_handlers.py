@@ -2,6 +2,7 @@ import random
 import time
 from flask import request
 from flask_socketio import emit
+from db.database import update_user_time_as_it, unlock_achievement
 
 # will be filled from server.py
 socketio = None
@@ -76,6 +77,14 @@ def init_handlers(sock):
             elapsed = time.time() - it_times[tagger]["started_at"]
             it_times[tagger]["total"] += elapsed
             it_times[tagger]["started_at"] = None
+            
+            # Update total 'it' time in MongoDB for the previous 'it' player
+            username_of_tagger = players[tagger]['name']
+            update_user_time_as_it(username_of_tagger, it_times[tagger]["total"])
+
+            # Check if the target unlocked 'First Tag' achievement
+            username_of_target = players[target]['name']
+            unlock_achievement(username_of_target, "first_tag")
             print(f"Updated 'it' time for {tagger}: +{elapsed:.2f}s, total: {it_times[tagger]['total']:.2f}s")
 
         # Set the new "it" player's start time
