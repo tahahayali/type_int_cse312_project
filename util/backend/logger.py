@@ -51,7 +51,8 @@ def log_request(response):
     """
     Logs every HTTP request: IP, method, path, status, timestamp, and JWT username if any.
     """
-    ip = request.remote_addr
+    # ip = request.remote_addr
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     method = request.method
     path = request.path
     status = response.status_code
@@ -68,7 +69,8 @@ def log_auth_attempt(action, username, success, reason=None):
     """
     Logs registration/login attempts: IP, timestamp, action, user, result.
     """
-    ip = request.remote_addr
+    # ip = request.remote_addr
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     timestamp = datetime.now(timezone.utc).isoformat()
     if success:
         entry = f"[{timestamp}] {ip} {action.upper()} SUCCESS for user '{username}'"
@@ -96,7 +98,8 @@ def log_raw_http(response):
     Logs raw HTTP request and response headers (up to 2048 bytes), redacting sensitive values.
     """
     timestamp = datetime.now(timezone.utc).isoformat()
-    ip = request.remote_addr
+    # ip = request.remote_addr
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     user = _get_username()
     user_part = f" user='{user}'" if user else ""
 
@@ -121,7 +124,8 @@ def log_error(e):
     """
     timestamp = datetime.now(timezone.utc).isoformat()
     try:
-        ip = request.remote_addr
+        # ip = request.remote_addr
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr)
         method = request.method
         path = request.path
     except Exception:
