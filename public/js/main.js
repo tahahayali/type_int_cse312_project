@@ -29,9 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
 
@@ -40,13 +38,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 loginMessage.textContent = 'Login successful!';
                 loginMessage.className = 'message success';
-                // showUserInfo(username);
                 checkAuthStatus();
             } else {
                 loginMessage.textContent = data.error || 'Login failed';
                 loginMessage.className = 'message error';
             }
-
         } catch (error) {
             loginMessage.textContent = 'An error occurred. Please try again.';
             loginMessage.className = 'message error';
@@ -69,9 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/register', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
 
@@ -80,13 +74,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (response.ok) {
                 registerMessage.textContent = 'Registration successful! You can now login.';
                 registerMessage.className = 'message success';
-                // Clear form
                 registerForm.reset();
             } else {
                 registerMessage.textContent = data.error || 'Registration failed';
                 registerMessage.className = 'message error';
             }
-
         } catch (error) {
             registerMessage.textContent = 'An error occurred. Please try again.';
             registerMessage.className = 'message error';
@@ -96,31 +88,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function handleLogout() {
         try {
-            const response = await fetch('/logout', {
-                method: 'GET'
-            });
-
-            if (response.ok) {
-                showLoginRegister();
-            }
-
+            const response = await fetch('/logout', { method: 'GET' });
+            if (response.ok) showLoginRegister();
         } catch (error) {
             console.error('Logout error:', error);
         }
     }
 
-    async function checkAuthStatus()
-    {
+    async function checkAuthStatus() {
         try {
-            // Call our API endpoint to get current user info
             const response = await fetch('/api/current-user');
-
             if (response.ok) {
-                // User is authenticated
                 const userData = await response.json();
                 showUserInfo(userData.username);
             } else {
-                // User is not authenticated
                 showLoginRegister();
             }
         } catch (error) {
@@ -143,8 +124,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function startGame() {
         gameContainer.style.display = 'block';
-        // Here you would initialize your Phaser game
-        console.log('Starting game...');
         window.location.href = '/game';
     }
 });

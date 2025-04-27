@@ -5,37 +5,29 @@ import os
 from flask import Flask, send_from_directory, abort, g, jsonify
 from flask_socketio import SocketIO
 # from db.database import users, sessions, login_attempts, stats
-# bring in your logging utilities
 from util.backend.logger import (
     log_request,
     log_raw_http,
     register_error_handlers
 )
-# For authentication
 from util.backend.authentication.auth import register, login, logout, token_required
-
-# For avatar uploads
 from util.backend.upload.avatar import upload_avatar
-
 
 app = Flask(__name__)
 
-# ← ADD THIS HERE, immediately after you’ve done Flask(__name__)
 register_error_handlers(app)
 
 app.after_request(log_request)
 app.after_request(log_raw_http)
-socketio = SocketIO(app, cors_allowed_origins="*")  # change this to cors_allowed_origins=["https://website_name"] when we're actually in production
+
+socketio = SocketIO(app, cors_allowed_origins="*")  # Allow all origins during dev
+
 from util.backend import socket_server
 
-# For authentication.
+# Secret Key
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev_secret_key")
 
-# app.post("/register")(register)
-# app.post("/login")(login)
-# app.get("/logout")(logout)
-
-
+# =================== Authentication Routes ===================
 
 @app.post('/register')
 def register_route():
@@ -49,12 +41,17 @@ def login_route():
 def logout_route():
     return logout()
 
+# =================== Game Routes ===================
 
 @app.route('/game')
 def game():
-    return send_from_directory("public/html", "game.html")
+    return send_from_directory('public/html', 'game.html')
 
-@app.post("/upload_avatar")
+@app.route('/')
+def home():
+    return send_from_directory('public/html', 'home_page.html')
+
+@app.post('/upload_avatar')
 def avatar_upload_route():
     return upload_avatar()
 
@@ -62,23 +59,40 @@ def avatar_upload_route():
 def serve_avatar(filename):
     return send_from_directory('static/avatars', filename)
 
-
 @app.route('/api/current-user')
 @token_required
 def current_user():
-    """Return information about the currently logged-in user"""
     return jsonify({"username": g.username})
-@app.route('/')
-def index():
-    return send_from_directory("public/html", "home_page.html")
 
+# =================== Static File Routes ===================
 
-@app.route("/<path:path>")
-def serve_static(path):
+# Serve JS, CSS, assets (tilesets, etc.)
+@app.route('/assets/<path:filename>')
+def serve_assets(filename):
+    return send_from_directory('public/assets', filename)
+
+@app.route('/js/<path:filename>')
+def serve_js(filename):
+    return send_from_directory('public/js', filename)
+
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    return send_from_directory('public/css', filename)
+
+@app.route('/favicon.ico')
+def favicon():
+    # Optional: fix annoying browser favicon request
+    return send_from_directory('public', 'favicon.ico')
+
+# Generic fallback if no route matches
+@app.route('/<path:path>')
+def fallback(path):
     try:
-        return send_from_directory("public", path)
+        return send_from_directory('public', path)
     except:
         return abort(404)
+
+# =================== Server Start ===================
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=8080)
