@@ -1,51 +1,124 @@
-import random
-import time
+# import random
+# import time
+# from flask import request
+# from flask_socketio import emit
+# from db.database import update_user_time_as_it, unlock_achievement
+#
+# # will be filled from server.py
+# socketio = None
+# players = {}
+# MAP_SEED = random.randint(0, 2 ** 32 - 1)
+# it_times = {}  # Track how long each player has been "it"
+# became_it_time = {}  # Track when each player became "it" for cooldown
+# TAG_COOLDOWN = 0.2  # 0.2 seconds cooldown
+#
+#
+# def init_handlers(sock):
+#     """Call this exactly once from server.py after you create its SocketIO()"""
+#     global socketio
+#     socketio = sock
+#
+#     @socketio.on('connect')
+#     def _connect():
+#         sid = request.sid
+#         username = request.args.get('username', f'user-{sid[:4]}')
+#         spawn_x = random.randint(64, 700)
+#         spawn_y = random.randint(64, 500)
+#         is_it = len(players) == 0
+#
+#         players[sid] = dict(x=spawn_x, y=spawn_y, it=is_it, name=username)
+#
+#         # Initialize "it" time to 0 seconds
+#         it_times[sid] = {"total": 0, "started_at": None}
+#
+#         # If this player is "it", set their start time
+#         if is_it:
+#             it_times[sid]["started_at"] = time.time()
+#             became_it_time[sid] = time.time()  # Initialize cooldown time
+#
+#         # Include it_times in the init data
+#         emit('init', {'id': sid, 'seed': MAP_SEED, 'players': players, 'it_times': it_times})
+#         emit('playerJoined',
+#              {'id': sid, 'x': spawn_x, 'y': spawn_y,
+#               'it': is_it, 'name': username},
+#              broadcast=True, include_self=False)
+#
+#         # Send updated leaderboard to all clients
+#         emit('leaderboardUpdate', {'it_times': it_times}, broadcast=True)
+#         print(f"Player connected: {sid}, username: {username}, is_it: {is_it}")
+import random, time
 from flask import request
 from flask_socketio import emit
-from db.database import update_user_time_as_it, unlock_achievement
+from db.database import sessions, update_user_time_as_it, unlock_achievement
+import bcrypt
+import jwt as pyjwt
+import os
 
-# will be filled from server.py
+# These get set by init_handlers:
 socketio = None
 players = {}
-MAP_SEED = random.randint(0, 2 ** 32 - 1)
-it_times = {}  # Track how long each player has been "it"
-became_it_time = {}  # Track when each player became "it" for cooldown
-TAG_COOLDOWN = 0.2  # 0.2 seconds cooldown
-
+it_times = {}
+became_it_time = {}
+TAG_COOLDOWN = 0.2
+MAP_SEED = random.randint(0, 2**32 - 1)
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev_secret_key")
 
 def init_handlers(sock):
-    """Call this exactly once from server.py after you create its SocketIO()"""
     global socketio
     socketio = sock
 
     @socketio.on('connect')
     def _connect():
         sid = request.sid
-        username = request.args.get('username', f'user-{sid[:4]}')
+
+        # Authenticate via the same JWT cookie
+        token = request.cookies.get('auth_token')
+        if not token:
+            return False  # reject
+        try:
+            payload = pyjwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            username = payload['username']
+        except Exception:
+            return False
+
+        # **Single-session enforcement**
+        sess = sessions.find_one({"username": username})
+        if sess and sess.get("socket_id") and sess["socket_id"] != sid:
+            # force‐disconnect the old socket
+            try:
+                socketio.server.disconnect(sess["socket_id"])
+            except Exception:
+                pass
+
+        # update this session doc with our new socket id
+        sessions.update_one(
+            {"username": username},
+            {"$set": {"socket_id": sid}}
+        )
+
+        # now the usual game‐join logic…
         spawn_x = random.randint(64, 700)
         spawn_y = random.randint(64, 500)
         is_it = len(players) == 0
 
-        players[sid] = dict(x=spawn_x, y=spawn_y, it=is_it, name=username)
-
-        # Initialize "it" time to 0 seconds
-        it_times[sid] = {"total": 0, "started_at": None}
-
-        # If this player is "it", set their start time
+        players[sid] = {"x": spawn_x, "y": spawn_y, "it": is_it, "name": username}
+        it_times[sid] = {"total": 0, "started_at": time.time() if is_it else None}
         if is_it:
-            it_times[sid]["started_at"] = time.time()
-            became_it_time[sid] = time.time()  # Initialize cooldown time
+            became_it_time[sid] = time.time()
 
-        # Include it_times in the init data
-        emit('init', {'id': sid, 'seed': MAP_SEED, 'players': players, 'it_times': it_times})
-        emit('playerJoined',
-             {'id': sid, 'x': spawn_x, 'y': spawn_y,
-              'it': is_it, 'name': username},
-             broadcast=True, include_self=False)
-
-        # Send updated leaderboard to all clients
+        emit('init', {
+            'id':       sid,
+            'seed':     MAP_SEED,
+            'players':  players,
+            'it_times': it_times
+        })
+        emit('playerJoined', {
+            'id': sid, 'x': spawn_x, 'y': spawn_y,
+            'it': is_it, 'name': username
+        }, broadcast=True, include_self=False)
         emit('leaderboardUpdate', {'it_times': it_times}, broadcast=True)
-        print(f"Player connected: {sid}, username: {username}, is_it: {is_it}")
+
+    # … rest of your move, tag, disconnect, etc. unchanged …
 
     @socketio.on('move')
     def _move(data):

@@ -40,17 +40,14 @@ def register():
     return jsonify(message="Registration successful"), 201
 
 
-
-
 def login():
-
-
-
     """
-    Handles user login. Expects JSON with 'username' and 'password'.
-    Issues a JWT and sets it as HttpOnly cookie if credentials valid.
+    Handles user login. Enforces a single session per user:
+      1) On login, drop any old session docs.
+      2) Insert the new session record.
+      3) HTTP-set the cookie as before.
     """
-    data = request.get_json() or {}
+    data     = request.get_json() or {}
     username = data.get("username")
     password = data.get("password")
 
@@ -58,39 +55,89 @@ def login():
         return jsonify(error="Username and password are required"), 400
 
     user = users.find_one({"username": username})
-    if not user or not bcrypt.checkpw(password.encode('utf-8'), user['password']):
+    if not user or not bcrypt.checkpw(password.encode(), user["password"]):
         log_auth_attempt("login", username, False, "Invalid credentials")
         return jsonify(error="Invalid username or password"), 401
 
-    # Generate JWT token
-    exp = datetime.utcnow() + timedelta(hours=TOKEN_EXP_HOURS)
+    # kill any old sessions for this user
+    sessions.delete_many({"username": username})
+
+    # generate JWT
+    exp     = datetime.utcnow() + timedelta(hours=TOKEN_EXP_HOURS)
     payload = {"username": username, "exp": exp}
-    token = pyjwt.encode(payload, SECRET_KEY, algorithm="HS256")
-    # Store only a bcrypt-hash of the token in the sessions collection
-    token_hash = bcrypt.hashpw(token.encode('utf-8'), bcrypt.gensalt())
+    token   = pyjwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+    # store only hash of token
+    token_hash = bcrypt.hashpw(token.encode(), bcrypt.gensalt())
     sessions.insert_one({
-        "username": username,
-        "token_hash": token_hash,
-        "created_at": datetime.now(timezone.utc),
-        "expires_at": exp
+        "username":     username,
+        "token_hash":   token_hash,
+        "created_at":   datetime.now(timezone.utc),
+        "expires_at":   exp,
+        # socket_id will be set once the WebSocket connects
     })
 
     log_auth_attempt("login", username, True)
 
-    # Set HttpOnly cookie
     resp = make_response(jsonify(message="Login successful"))
-
-    # In production, set secure=True
     is_prod = os.environ.get("ENVIRONMENT") == "production"
-
     resp.set_cookie(
         "auth_token", token,
         httponly=True,
-        secure=is_prod,  # Only use secure in production
-        samesite='Strict',
-        max_age=TOKEN_EXP_HOURS * 3600  # Convert hours to seconds
+        secure=is_prod,
+        samesite="Strict",
+        max_age=TOKEN_EXP_HOURS * 3600
     )
     return resp, 200
+
+# def login():
+#     """
+#     Handles user login. Expects JSON with 'username' and 'password'.
+#     Issues a JWT and sets it as HttpOnly cookie if credentials valid.
+#     """
+#     data = request.get_json() or {}
+#     username = data.get("username")
+#     password = data.get("password")
+#
+#     if not username or not password:
+#         return jsonify(error="Username and password are required"), 400
+#
+#     user = users.find_one({"username": username})
+#     if not user or not bcrypt.checkpw(password.encode('utf-8'), user['password']):
+#         log_auth_attempt("login", username, False, "Invalid credentials")
+#         return jsonify(error="Invalid username or password"), 401
+#
+#     # Generate JWT token
+#     exp = datetime.utcnow() + timedelta(hours=TOKEN_EXP_HOURS)
+#     payload = {"username": username, "exp": exp}
+#     token = pyjwt.encode(payload, SECRET_KEY, algorithm="HS256")
+#     # Store only a bcrypt-hash of the token in the sessions collection
+#     token_hash = bcrypt.hashpw(token.encode('utf-8'), bcrypt.gensalt())
+#     sessions.insert_one({
+#         "username": username,
+#         "token_hash": token_hash,
+#         "created_at": datetime.now(timezone.utc),
+#         "expires_at": exp
+#     })
+#
+#
+#
+#     log_auth_attempt("login", username, True)
+#
+#     # Set HttpOnly cookie
+#     resp = make_response(jsonify(message="Login successful"))
+#
+#     # In production, set secure=True
+#     is_prod = os.environ.get("ENVIRONMENT") == "production"
+#
+#     resp.set_cookie(
+#         "auth_token", token,
+#         httponly=True,
+#         secure=is_prod,  # Only use secure in production
+#         samesite='Strict',
+#         max_age=TOKEN_EXP_HOURS * 3600  # Convert hours to seconds
+#     )
+#     return resp, 200
 
 
 def logout():
@@ -127,7 +174,7 @@ def token_required(fn):
     Decorator to protect routes: checks for valid JWT cookie and session.
     """
     from functools import wraps
-    from flask import g
+    from flask import request, g
 
     @wraps(fn)
     def wrapper(*args, **kwargs):
