@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Change Your Avatar</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Change Avatar</h1>
+            <p>Upload a new avatar image. Max size: 5 MB (JPG or PNG)</p>
+        </header>
+
+        <div id="avatar-section" style="text-align: center;">
+            <h2>Current Avatar</h2>
+            <img id="current-avatar" src="" alt="Current Avatar" style="width: 128px; height: 128px; border-radius: 8px; border: 2px solid #333; margin-bottom: 20px;">
+        </div>
+
+        <form id="upload-form" enctype="multipart/form-data" style="text-align: center;">
+            <input type="file" name="avatar" id="avatar-input" accept="image/png, image/jpeg" required>
+            <br><br>
+            <button type="submit" class="btn">Upload New Avatar</button>
+        </form>
+
+        <p id="upload-message" class="message" style="text-align: center;"></p>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="/" class="btn">Return Home</a>
+        </div>
+    </div>
+
+    <script>
+        // Set the current avatar
+        document.addEventListener('DOMContentLoaded', async () => {
+            const res = await fetch('/api/current-user');
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('current-avatar').src = `/static/avatars/${data.username}.png`;
+            }
+        });
+
+        // Handle upload form
+        document.getElementById('upload-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('avatar-input');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please select a file.');
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                alert('File size exceeds 5 MB.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('avatar', file);
+
+            const resUser = await fetch('/api/current-user');
+            if (!resUser.ok) {
+                alert('Failed to get user.');
+                return;
+            }
+            const { username } = await resUser.json();
+            formData.append('username', username);
+
+            const res = await fetch('/upload_avatar', {
+                method: 'POST',
+                body: formData
+            });
+
+            const msg = document.getElementById('upload-message');
+            if (res.ok) {
+                msg.textContent = 'Avatar uploaded successfully!';
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                const data = await res.json();
+                msg.textContent = 'Upload failed: ' + (data.error || 'Unknown error');
+            }
+        });
+    </script>
+</body>
+</html>
