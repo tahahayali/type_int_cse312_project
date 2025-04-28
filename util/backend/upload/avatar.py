@@ -9,6 +9,9 @@ ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 AVATAR_DIR = os.path.join("static", "avatars")
 os.makedirs(AVATAR_DIR, exist_ok=True)
 
+# Maximum allowed size (5MB)
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB in bytes
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -26,6 +29,14 @@ def upload_avatar():
         return jsonify({"error": "No selected file"}), 400
 
     if file and allowed_file(file.filename):
+        # Check file size
+        file.seek(0, os.SEEK_END)
+        file_length = file.tell()
+        file.seek(0)  # Reset stream position
+
+        if file_length > MAX_FILE_SIZE:
+            return jsonify({"error": "File too large. Max 5MB allowed."}), 400
+
         try:
             filename = secure_filename(username + ".png")  # Always save as .png
             filepath = os.path.join(AVATAR_DIR, filename)
@@ -36,7 +47,7 @@ def upload_avatar():
 
             # Log it
             timestamp = datetime.now(timezone.utc).isoformat()
-            ip = request.remote_addr
+            ip = request.headers.get('X-Forwarded-For', request.remote_addr)
             logging.info(f"[{timestamp}] {ip} UPLOAD avatar for '{username}' -> {filename}")
 
             return jsonify({"success": True, "avatar_url": f"/static/avatars/{filename}"})
