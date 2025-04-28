@@ -92,6 +92,10 @@ document.addEventListener('DOMContentLoaded', () => {
             await fetch('/logout');
         } finally {
             localStorage.removeItem(LS_KEY);
+         // disconnect any existing socket when we leave the game page
+           if (window.network && window.network.socket) {
+               window.network.socket.disconnect();
+           }
             showLoginView();
         }
     }

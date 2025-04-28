@@ -9,14 +9,20 @@ export default class Network {
         this.leaderboardVisible = false; // Track if leaderboard is visible
         this.tagCooldown = false; // Prevent rapid tagging
 
-        /* include username if we have it */
-        const storedName = localStorage.getItem('tag_username') || '';
-
+        // /* include username if we have it */
+        // const storedName = localStorage.getItem('tag_username') || '';
+        //
+        // this.socket = io({
+        //     transports: ['websocket'],
+        //     upgrade   : false,
+        //     query     : { username: storedName }
+        // });
+    // connect over WS, rely on auth_token cookie (no more username query)
         this.socket = io({
             transports: ['websocket'],
-            upgrade   : false,
-            query     : { username: storedName }
+            upgrade   : false
         });
+
 
         /* ----- server → client ----- */
         this.socket.on('init',           data => this.handleInit(data));
@@ -45,11 +51,18 @@ export default class Network {
             .setFillStyle(this.isIt ? 0xff0000 : 0x00ff00)
             .setStrokeStyle(this.isIt ? 4 : 0, 0xff0000);
 
-        for (const id in data.players) {
-            if (id === this.myID) continue;
-            const p = data.players[id];
-            this.spawn({ id, ...p });
-        }
+        // for (const id in data.players) {
+        //     if (id === this.myID) continue;
+        //     const p = data.players[id];
+        //     this.spawn({ id, ...p });
+        // }
+
+        // only spawn *new* players
+       for (const id in data.players) {
+           if (id === this.myID || this.players[id]) continue;
+           const p = data.players[id];
+           this.spawn({ id, ...p });
+       }
 
         this.updateActivePlayers();
 
@@ -59,7 +72,15 @@ export default class Network {
         }
     }
 
-    spawn({ id, x, y, it, name = '' }) {
+    spawn({ id, x, y, it, name = '' })
+    {
+     // skip if already spawned (duplicate init)
+       if (this.players[id]) {
+           const entry = this.players[id];
+           entry.container.setPosition(x, y);
+           entry.circle.setFillStyle(it ? 0xff0000 : 0x0000ff);
+           return;
+       }
         const circle = this.scene.add
             .circle(0, 0, 16, it ? 0xff0000 : 0x0000ff)
             .setStrokeStyle(it ? 4 : 0, 0xff0000);
