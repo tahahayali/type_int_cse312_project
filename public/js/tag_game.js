@@ -48,6 +48,14 @@ class GameScene extends Phaser.Scene {
       fontSize: '18px', color: '#fff', backgroundColor: '#333', padding: { x: 10, y: 5 }
     }).setScrollFactor(0).setDepth(1000);
 
+    this.add.text(20, 0, 'Reverse Tag: Stay IT longest!', {
+  fontSize: '14px',
+  color: '#aaa',
+  backgroundColor: '#222',
+  padding: { x: 8, y: 3 }
+}).setScrollFactor(0).setDepth(1000);
+
+
     this.add.text(20, 60, 'Press L (or button) to toggle leaderboard', {
       fontSize: '18px', color: '#fff', backgroundColor: '#333', padding: { x: 10, y: 5 }
     }).setScrollFactor(0).setDepth(1000);
@@ -204,9 +212,9 @@ class GameScene extends Phaser.Scene {
 
   updateStatusText() {
     if (this.network.isIt) {
-      this.statusText.setText('You are IT! Tag someone!').setColor('#ff0000');
+      this.statusText.setText('Stay IT! Run from others!').setColor('#ff0000');
     } else {
-      this.statusText.setText('Run! Don’t get tagged!').setColor('#00ff00');
+      this.statusText.setText('Chase the IT player!').setColor('#00ff00');
     }
   }
 
