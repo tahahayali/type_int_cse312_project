@@ -14,6 +14,8 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 players = {}  # sid → {x, y, it, name}
 it_times = {}  # Track how long each player has been "it"
+became_it_time = {}  # Track when each player became "it" for cooldown
+TAG_COOLDOWN = 0.2  # 0.2 seconds cooldown
 
 
 @app.route("/")
@@ -37,6 +39,7 @@ def handle_connect():
     # If this player is "it", set their start time
     if is_it:
         it_times[sid]["started_at"] = time.time()
+        became_it_time[sid] = time.time()  # Initialize cooldown time
 
     emit("init", {"id": sid, "seed": MAP_SEED, "players": players, "it_times": it_times})
     emit("playerJoined",
@@ -62,6 +65,7 @@ def handle_move(data):
 def handle_tag(data):
     tagger = request.sid
     target = data.get("id")
+    current_time = time.time()
 
     # Validate the tag
     if tagger not in players:
@@ -74,6 +78,11 @@ def handle_tag(data):
 
     if not players[tagger]["it"]:
         print(f"Tag error: Tagger {tagger} is not 'it'")
+        return
+
+    # Check if the tagger just became "it" (on cooldown)
+    if tagger in became_it_time and (current_time - became_it_time[tagger]) < TAG_COOLDOWN:
+        print(f"Tag error: Tagger {tagger} is on cooldown (recently became 'it')")
         return
 
     print(f"Tag event: {tagger} tagged {target}")
@@ -95,6 +104,9 @@ def handle_tag(data):
     players[tagger]["it"] = False
     players[target]["it"] = True
 
+    # Record when the target became "it" for cooldown
+    became_it_time[target] = current_time
+
     print(f"New 'it' player: {target}")
 
     # Send tag update
@@ -111,6 +123,10 @@ def handle_disconnect():
     if sid not in players:
         print(f"Disconnect for unknown player: {sid}")
         return
+
+    # Clean up cooldown tracking when player disconnects
+    if sid in became_it_time:
+        del became_it_time[sid]
 
     was_it = players[sid].get("it", False)
     username = players[sid].get("name", sid[:4])
@@ -143,6 +159,9 @@ def handle_disconnect():
             it_times[new_it] = {"total": 0, "started_at": time.time()}
         else:
             it_times[new_it]["started_at"] = time.time()
+
+        # Set cooldown for the new "it" player
+        became_it_time[new_it] = time.time()
 
         print(f"Assigning new 'it' player: {new_it}")
 

@@ -145,22 +145,13 @@ export default class Network {
     }
 
     sendTag(id) {
-        // Only send tag if we're "it" and not on cooldown
-        if (this.isIt && !this.tagCooldown) {
-            console.log(`Sending tag event for player ${id}`);
-
-            // Set a brief cooldown to prevent accidental double-tags
-            this.tagCooldown = true;
-            setTimeout(() => {
-                this.tagCooldown = false;
-            }, 500);
-
-            this.socket.emit('tag', { id });
-        } else if (!this.isIt) {
-            console.log('Not IT, cannot tag');
-        } else {
-            console.log('Tag on cooldown');
-        }
+    // Only send tag if we're "it" (cooldown is now handled server-side)
+    if (this.isIt) {
+        console.log(`Sending tag event for player ${id}`);
+        this.socket.emit('tag', { id });
+    } else {
+        console.log('Not IT, cannot tag');
+    }
     }
 
     requestLeaderboard() {
@@ -414,16 +405,4 @@ export default class Network {
         }
     }
 
-    // Then, modify the updateLeaderboardUI function to call this function
-    // Add this call at the beginning of updateLeaderboardUI:
-
-
-    // And add these calls to the handleInit, spawn, and remove functions:
-
-    // In handleInit, after processing players:
-
-    // In spawn, after adding a player:
-
-
-    // In remove, after removing a player:
 }
