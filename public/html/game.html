@@ -107,57 +107,59 @@
     };
 
     // Function that will be called from the game code to update the DOM leaderboard
-    window.updateDOMLeaderboard = function(leaderboardData) {
-      leaderboardList.innerHTML = '';
+window.updateDOMLeaderboard = function(leaderboardData) {
 
-      const sortedPlayers = [];
-      for (const id in leaderboardData) {
-        // Skip inactive players (except for the current player)
-        if (!leaderboardData[id].isCurrentPlayer && !activePlayers[id]) {
-          continue;
-        }
+  console.log("Received leaderboard:", leaderboardData);
 
-        const player = leaderboardData[id];
-        let totalTime = player.total || 0;
 
-        // Add current time if player is "it"
-        if (player.started_at) {
-          totalTime += (Date.now() / 1000) - player.started_at;
-        }
+  leaderboardList.innerHTML = '';
 
-        sortedPlayers.push({
-          id,
-          name: player.name || id.slice(0, 4),
-          time: totalTime,
-          isCurrentPlayer: player.isCurrentPlayer
-        });
-      }
+  const sortedPlayers = [];
+  for (const id in leaderboardData) {
+    if (!leaderboardData[id].isCurrentPlayer && !activePlayers[id]) {
+      continue;
+    }
 
-      // Sort by time (longest first)
-      sortedPlayers.sort((a, b) => b.time - a.time);
+    const player = leaderboardData[id];
+    let totalTime = player.total || 0;
 
-      // Create leaderboard entries
-      sortedPlayers.forEach((player, index) => {
-        const li = document.createElement('li');
-        li.className = 'leaderboard-item';
-        if (player.isCurrentPlayer) {
-          li.classList.add('current-player');
-        }
 
-        // Format time as minutes:seconds
-        const minutes = Math.floor(player.time / 60);
-        const seconds = Math.floor(player.time % 60);
-        const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    if (player.it && player.started_at) {
+      totalTime += (Date.now() / 1000) - player.started_at;
+    }
 
-        li.innerHTML = `
-          <div class="leaderboard-rank">${index + 1}.</div>
-          <div class="leaderboard-name">${player.name}</div>
-          <div class="leaderboard-time">${timeText}</div>
-        `;
+    sortedPlayers.push({
+  id,
+  name: player.name || id.slice(0, 4),
+  time: totalTime,
+  isCurrentPlayer: player.isCurrentPlayer,
+  it: player.it,
+  started_at: player.started_at
+});
+  }
 
-        leaderboardList.appendChild(li);
-      });
-    };
+  sortedPlayers.sort((a, b) => b.time - a.time);
+
+  sortedPlayers.forEach((player, index) => {
+    const li = document.createElement('li');
+    li.className = 'leaderboard-item';
+    if (player.isCurrentPlayer) {
+      li.classList.add('current-player');
+    }
+
+    const minutes = Math.floor(player.time / 60);
+    const seconds = Math.floor(player.time % 60);
+    const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    li.innerHTML = `
+      <div class="leaderboard-rank">${index + 1}.</div>
+      <div class="leaderboard-name">${player.name}</div>
+      <div class="leaderboard-time">${timeText}</div>
+    `;
+    leaderboardList.appendChild(li);
+  });
+};
+
   </script>
 
   <script type="module">

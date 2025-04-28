@@ -34,7 +34,7 @@ export default class Network {
 
         // Add debugging for socket events
         this.socket.onAny((event, ...args) => {
-            console.log(`Socket event: ${event}`, args);
+            //console.log(`Socket event: ${event}`, args);
         });
     }
 
