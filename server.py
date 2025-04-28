@@ -56,9 +56,6 @@ def game():
 def home():
     return send_from_directory('public/html', 'home_page.html')
 
-@app.route('/upload_avatar')
-def home():
-    return send_from_directory('public/html', 'upload_avatar.html')
 
 @app.post('/upload_avatar')
 def avatar_upload_route():
