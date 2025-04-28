@@ -5,26 +5,6 @@
 
 import Network from './socket.js';
 
-// tag_game.js
-
-// ✅ Add this first
-async function verifyLoginOrRedirect() {
-    try {
-        const res = await fetch('/api/current-user');
-        if (!res.ok) {
-            window.location.href = '/';  // Not logged in, redirect home
-        }
-    } catch (err) {
-        console.error('Error verifying login:', err);
-        window.location.href = '/';      // Network error, also redirect home
-    }
-}
-
-await verifyLoginOrRedirect();  // Immediately verify before continuing
-
-// ✅ Now everything else below, no change
-import Network from './socket.js';
-
 class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
