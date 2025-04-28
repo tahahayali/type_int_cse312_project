@@ -285,12 +285,33 @@ class GameScene extends Phaser.Scene {
 }
 
 /* ───────────────────────── Launch Phaser ───────────────────────── */
-new Phaser.Game({
-  type           : Phaser.AUTO,
-  width          : window.innerWidth,
-  height         : window.innerHeight,
-  backgroundColor: '#111',
-  pixelArt       : true,
-  scene          : GameScene,
-  scale          : { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
-});
+
+// ⬇️ ADD this async main() function
+async function main() {
+    try {
+        const res = await fetch('/api/current-user');
+        if (!res.ok) {
+            console.log('Not authenticated, redirecting to home.');
+            window.location.href = '/';
+            return;
+        }
+    } catch (err) {
+        console.error('Error checking login:', err);
+        window.location.href = '/';
+        return;
+    }
+
+    console.log('Authenticated, starting game.');
+    // only create game after verifying login
+    new Phaser.Game({
+      type           : Phaser.AUTO,
+      width          : window.innerWidth,
+      height         : window.innerHeight,
+      backgroundColor: '#111',
+      pixelArt       : true,
+      scene          : GameScene,
+      scale          : { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
+    });
+}
+
+main();
