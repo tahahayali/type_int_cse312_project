@@ -165,15 +165,22 @@ export default class Network {
         this.socket.emit('move', { x, y });
     }
 
+    // sendTag(id) {
+    // // Only send tag if we're "it" (cooldown is now handled server-side)
+    // if (this.isIt) {
+    //     console.log(`Sending tag event for player ${id}`);
+    //     this.socket.emit('tag', { id });
+    // } else {
+    //     console.log('Not IT, cannot tag');
+    // }
+    // }
+
     sendTag(id) {
-    // Only send tag if we're "it" (cooldown is now handled server-side)
-    if (this.isIt) {
-        console.log(`Sending tag event for player ${id}`);
-        this.socket.emit('tag', { id });
-    } else {
-        console.log('Not IT, cannot tag');
-    }
-    }
+    console.log(`Attempting tag event on ${id}`);
+    this.socket.emit('tag', { id });
+}
+
+
 
     requestLeaderboard() {
         this.socket.emit('getLeaderboard');

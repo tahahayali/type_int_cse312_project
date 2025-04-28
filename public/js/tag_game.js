@@ -126,22 +126,51 @@ class GameScene extends Phaser.Scene {
     if (moved) this.network.sendMove(this.player.x, this.player.y);
 
     /* collision-based tagging */
-    if (this.network.isIt) {
+    // if (this.network.isIt) {
+    //   for (const id in this.network.players)
+    //   {
+    //     const other = this.network.players[id];
+    //     if (!other) continue;
+    //     const dist = Phaser.Math.Distance.Between(
+    //       this.player.x, this.player.y, other.container.x, other.container.y
+    //     );
+    //     if (dist < 32) {
+    //       this.network.sendTag(id);
+    //       const { circle } = other;
+    //       const s0 = circle.scaleX;
+    //       circle.setScale(1.5);
+    //       this.tweens.add({ targets: circle, scaleX: s0, scaleY: s0, duration: 200, ease: 'Quad.easeOut' });
+    //     }
+    //   }
+    // }
+// only non–IT players bump the IT player to tag
+    if (!this.network.isIt) {
       for (const id in this.network.players) {
         const other = this.network.players[id];
-        if (!other) continue;
+        if (!other.it) continue;    // skip anyone who isn't IT
         const dist = Phaser.Math.Distance.Between(
-          this.player.x, this.player.y, other.container.x, other.container.y
+            this.player.x, this.player.y,
+            other.container.x, other.container.y
         );
         if (dist < 32) {
+          console.log(`Bumping IT (${id}), sending tag…`);
           this.network.sendTag(id);
-          const { circle } = other;
-          const s0 = circle.scaleX;
+          // brief pulse on their circle
+          const {circle} = other;
+          const origScale = circle.scaleX;
           circle.setScale(1.5);
-          this.tweens.add({ targets: circle, scaleX: s0, scaleY: s0, duration: 200, ease: 'Quad.easeOut' });
+          this.tweens.add({
+            targets: circle,
+            scaleX: origScale,
+            scaleY: origScale,
+            duration: 200,
+            ease: 'Quad.easeOut'
+          });
+          break;  // only tag once per bump
         }
       }
     }
+
 
     /* L key toggles leaderboard */
     if (Phaser.Input.Keyboard.JustDown(this.leaderboardKey)) this.toggleLeaderboard();
