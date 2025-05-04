@@ -7,3 +7,5 @@ util/.DS_Store
 # Ignore uploaded avatars (runtime user content)
 static/avatars/
 
+__pycache__/
+*.pyc

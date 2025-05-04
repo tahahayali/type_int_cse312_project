@@ -2,12 +2,18 @@ from flask import Flask, request
 from flask_socketio import SocketIO, emit
 import random, time, eventlet
 eventlet.monkey_patch()          # ✱ for the background task
+from util.backend.map_generator import generate_blocked_tiles
 
 app               = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret'
 socketio          = SocketIO(app, cors_allowed_origins='*')
 
 MAP_SEED          = random.randint(0, 2**32 - 1)
+from util.backend.map_generator import generate_blocked_tiles
+BLOCKED_TILES, FREE_TILES = generate_blocked_tiles(MAP_SEED)
+free_spawn_pool = FREE_TILES.copy()
+random.shuffle(free_spawn_pool)
+free_spawn_pool = FREE_TILES.copy()
 TAG_COOLDOWN      = 0.20                              # sec
 
 players           = {}   # sid → {x,y,it,name}
@@ -38,11 +44,29 @@ def index():
 def on_connect():
     sid       = request.sid
     username  = request.args.get('username', f'user-{sid[:4]}')
-    spawn_x   = random.randint(64, 700)
-    spawn_y   = random.randint(64, 500)
+    tile_size = 16 * 3  # tileSize * scaleFactor from JS
+    map_width = 60
+    map_height = 40
+
+    if not free_spawn_pool:
+        print("⚠️ No free spawn tiles left!")
+        return  # or handle fallback
+    
+    tile_x, tile_y = free_spawn_pool.pop()
+
+    spawn_x = tile_x * tile_size
+    spawn_y = tile_y * tile_size
+
     is_it     = len([p for p in players.values() if p['it']]) == 0
 
-    players[sid] = {'x': spawn_x, 'y': spawn_y, 'it': is_it, 'name': username}
+    players[sid] = {
+    'x': spawn_x,
+    'y': spawn_y,
+    'tile': (tile_x, tile_y),  # ✅ added line
+    'it': is_it,
+    'name': username
+    }
+
     it_times[sid] = {'total': 0, 'started_at': time.time() if is_it else None}
     if is_it:
         became_it_time[sid] = time.time()
@@ -59,10 +83,17 @@ def on_connect():
 def on_move(data):
     sid = request.sid
     if sid in players:
-        players[sid]['x'] = data['x']
-        players[sid]['y'] = data['y']
-        emit('playerMoved', {'id': sid, 'x': data['x'], 'y': data['y']},
-             broadcast=True, include_self=False)
+        x = data['x']
+        y = data['y']
+        tile_size = 16 * 3
+        tile_x = int(x // tile_size)
+        tile_y = int(y // tile_size)
+        if (tile_x, tile_y) in BLOCKED_TILES:
+            return  # silently reject illegal move
+
+        players[sid]['x'] = x
+        players[sid]['y'] = y
+        emit('playerMoved', {'id': sid, 'x': x, 'y': y}, broadcast=True, include_self=False)
 
 
 @socketio.on('tag')                       # REVERSE TAG  ✓ one handler only
@@ -104,6 +135,11 @@ def on_disconnect():
     sid     = request.sid
     if sid not in players:
         return
+    # Reclaim the spawn tile
+    tile_size = 16 * 3
+    tile_x = players[sid]['x'] // tile_size
+    tile_y = players[sid]['y'] // tile_size
+    free_spawn_pool.append((tile_x, tile_y))
     was_it  = players[sid]['it']
 
     # finalise any running timer
