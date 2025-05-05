@@ -47,14 +47,15 @@ from db.database import users
 @app.route('/api/stats/<username>')
 @token_required
 def get_stats(username):
-    """Return totalTags & totalTimeIt for a given user."""
+    """Return totalTags, totalTimeIt, longestStreak for a given user."""
     doc = users.find_one(
         {"username": username},
-        {"_id": 0, "username": 1, "totalTags": 1, "totalTimeIt": 1}
+        {"_id": 0, "username": 1, "totalTags": 1, "totalTimeIt": 1, "longestStreak": 1}
     )
     if not doc:
         return jsonify(error="User not found"), 404
     return jsonify(doc), 200
+
 
 @app.route('/api/leaderboard')
 def get_leaderboard():
@@ -108,6 +109,16 @@ def serve_avatar(filename):
 @token_required
 def current_user():
     return jsonify({"username": g.username})
+
+# ---------- Extra pages ----------
+@app.route('/leaderboard_page')
+def global_leaderboard_page():
+    return send_from_directory('public/html', 'leaderboard.html')
+
+@app.route('/stats_page')
+def stats_page():
+    return send_from_directory('public/html', 'stats.html')
+
 
 # =================== Static File Routes ===================
 

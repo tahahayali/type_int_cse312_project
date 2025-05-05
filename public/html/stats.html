@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Stats – Tag Royale</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body {
+      background-color: #111;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .btn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #444;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      text-decoration: none;
+    }
+
+    .avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      border: 2px solid #555;
+      object-fit: cover;
+    }
+
+    .stats-list {
+      list-style: none;
+      padding: 0;
+      font-size: 18px;
+    }
+
+    .stats-list li {
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 My Stats</h1>
+  <div id="profile" style="display:none">
+    <img id="avatar-img" class="avatar" src="" alt="Avatar">
+    <h2 id="username">Loading...</h2>
+    <ul class="stats-list">
+      <li><strong>Total Tags:</strong> <span id="total-tags"></span></li>
+      <li><strong>Total Time as IT (s):</strong> <span id="total-time"></span></li>
+      <li><strong>Longest IT Streak (s):</strong> <span id="longest-streak"></span></li>
+    </ul>
+  </div>
+  <p id="stats-error" class="message"></p>
+  <a href="/" class="btn">← Back to Home</a>
+
+  <script>
+    (async () => {
+      try {
+        const userRes = await fetch('/api/current-user');
+        if (!userRes.ok) throw new Error('Auth failed');
+        const { username } = await userRes.json();
+
+        const statsRes = await fetch(`/api/stats/${username}`);
+        const stats = await statsRes.json();
+        if (!stats.username) throw new Error('Not found');
+
+        document.getElementById('username').textContent = stats.username;
+        document.getElementById('total-tags').textContent = stats.totalTags ?? 0;
+        document.getElementById('total-time').textContent = Math.round(stats.totalTimeIt ?? 0);
+        document.getElementById('longest-streak').textContent = Math.round(stats.longestStreak ?? 0);
+
+        // Avatar fallback
+        const img = document.getElementById('avatar-img');
+        const url = `/static/avatars/${username}.png`;
+        img.onerror = () => img.style.display = 'none';
+        img.src = url;
+
+        document.getElementById('profile').style.display = 'block';
+      } catch {
+        document.getElementById('stats-error').textContent =
+          'Unable to load stats. Please log in first.';
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Global Leaderboard – Tag Royale</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    body {
+      background-color: #111;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-top: 10px;
+    }
+
+    .btn {
+      margin: 15px 0;
+      padding: 10px 20px;
+      background-color: #444;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      text-decoration: none;
+    }
+
+    table {
+      width: 80%;
+      max-width: 800px;
+      margin: 30px auto;
+      border-collapse: collapse;
+      background-color: #222;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #444;
+    }
+
+    th {
+      background-color: #333;
+    }
+
+    tr:nth-child(even) {
+      background-color: #1a1a1a;
+    }
+
+    tr:hover {
+      background-color: #2a2a2a;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌍 Global Leaderboard</h1>
+  <p>Ranked by longest streak as IT</p>
+  <a href="/" class="btn">← Back to Home</a>
+
+  <table>
+    <thead>
+      <tr><th>Rank</th><th>User</th><th>Longest Streak</th></tr>
+    </thead>
+    <tbody id="board-body"></tbody>
+  </table>
+
+  <script>
+    fetch('/api/leaderboard')
+      .then(res => res.json())
+      .then(data => {
+        const body = document.getElementById('board-body');
+        data.forEach((entry, i) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${entry.user || entry.username}</td>
+            <td>${entry.longestStreak}</td>
+          `;
+          body.appendChild(tr);
+        });
+      });
+  </script>
+</body>
+</html>
