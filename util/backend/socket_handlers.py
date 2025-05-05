@@ -16,8 +16,29 @@ it_times = {}
 became_it_time = {}
 TAG_COOLDOWN = 0.2
 MAP_SEED = random.randint(0, 2**32 - 1)
+from util.backend.map_generator import generate_blocked_tiles
+
+BLOCKED_TILES, FREE_TILES = generate_blocked_tiles(MAP_SEED)
+free_spawn_pool = FREE_TILES.copy()
+random.shuffle(free_spawn_pool)
+
+
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev_secret_key")
 ALLOWED_EXTENSIONS_ON_DISK = ("png", "jpg", "jpeg")
+
+def get_free_spawn():
+    """Return pixel co‑ordinates on a walkable tile (48 px grid)."""
+    tile_size = 16 * 3          # same as client
+    if free_spawn_pool:
+        tx, ty = free_spawn_pool.pop()
+    else:                       # safety fallback – linear scan
+        for tx in range(1, 58):
+            for ty in range(1, 38):
+                if (tx, ty) not in BLOCKED_TILES:
+                    break
+    return tx * tile_size, ty * tile_size
+
+
 
 
 def build_enriched_it_times():
@@ -70,8 +91,8 @@ def init_handlers(sock):
         sessions.update_one({"username": username}, {"$set": {"socket_id": sid}})
 
         # Choose spawn location
-        spawn_x = random.randint(64, 700)
-        spawn_y = random.randint(64, 500)
+        spawn_x, spawn_y = get_free_spawn()
+
         is_it = len([p for p in players.values() if p['it']]) == 0
 
         # Register new player
