@@ -11,6 +11,7 @@ class GameScene extends Phaser.Scene {
     this.blockedTiles          = new Set();
     this.lastLeaderboardUpdate = 0;
     this.dungeonBuilt          = false;
+    this.toasts                = []; // Array to track active toast notifications
   }
 
   preload() {
@@ -52,11 +53,11 @@ class GameScene extends Phaser.Scene {
     }).setScrollFactor(0).setDepth(1000);
 
     this.add.text(20, 0, 'Reverse Tag: Stay IT longest!', {
-  fontSize: '14px',
-  color: '#aaa',
-  backgroundColor: '#222',
-  padding: { x: 8, y: 3 }
-}).setScrollFactor(0).setDepth(1000);
+      fontSize: '14px',
+      color: '#aaa',
+      backgroundColor: '#222',
+      padding: { x: 8, y: 3 }
+    }).setScrollFactor(0).setDepth(1000);
 
 
     this.add.text(20, 60, 'Press L (or button) to toggle leaderboard', {
@@ -67,7 +68,7 @@ class GameScene extends Phaser.Scene {
       fontSize: '18px', color: '#fff', backgroundColor: '#333', padding: { x: 10, y: 5 }
     }).setScrollFactor(0).setDepth(1000);
 
-    /* wire any DOM “leaderboard-toggle” button (optional) */
+    /* wire any DOM "leaderboard-toggle" button (optional) */
     const domToggle = document.getElementById('leaderboard-toggle');
     if (domToggle) domToggle.addEventListener('click', () => this.toggleLeaderboard());
   }
@@ -125,11 +126,94 @@ class GameScene extends Phaser.Scene {
       this.network.requestLeaderboard();
       this.lastLeaderboardUpdate = Date.now();
     }
+    /* Update toast positions if needed */
+    this.updateToastPositions();
   }
 
+  /* ───────────────────────── Achievement Toast ───────────────────────── */
+  showAchievementToast(data) {
+    // Check if this achievement has already been shown (using localStorage)
+    const shownAchievements = JSON.parse(localStorage.getItem('shownAchievements') || '{}');
 
+    // If this achievement is already shown, don't show it again
+    if (shownAchievements[data.achievement]) {
+      return;
+    }
 
+    // Mark this achievement as shown
+    shownAchievements[data.achievement] = true;
+    localStorage.setItem('shownAchievements', JSON.stringify(shownAchievements));
 
+    const { width, height } = this.game.config;
+
+    // Create toast container
+    const toastY = height - 100 - (this.toasts.length * 80);
+    const toast = this.add.container(width - 200, toastY).setScrollFactor(0).setDepth(2000);
+
+    // Add toast background
+    const bg = this.add.rectangle(0, 0, 350, 70, 0x000000, 0.8).setOrigin(0.5);
+    toast.add(bg);
+
+    // Add achievement icon
+    const icon = this.add.text(-150, 0, '🏆', { fontSize: '32px' }).setOrigin(0.5);
+    toast.add(icon);
+
+    // Add achievement text
+    const title = this.add.text(-80, -15, data.name, {
+      fontSize: '18px',
+      fontStyle: 'bold',
+      color: '#ffffff'
+    }).setOrigin(0, 0.5);
+
+    const desc = this.add.text(-80, 15, data.description, {
+      fontSize: '14px',
+      color: '#cccccc'
+    }).setOrigin(0, 0.5);
+
+    toast.add(title);
+    toast.add(desc);
+
+    // Track this toast
+    this.toasts.push(toast);
+
+    // Animate in
+    this.tweens.add({
+      targets: toast,
+      x: width - 200,
+      duration: 500,
+      ease: 'Back.easeOut',
+      onComplete: () => {
+        // After 5 seconds, animate out and destroy
+        this.time.delayedCall(5000, () => {
+          this.tweens.add({
+            targets: toast,
+            x: width + 400,
+            duration: 500,
+            ease: 'Back.easeIn',
+            onComplete: () => {
+              // Remove from array and destroy
+              this.toasts = this.toasts.filter(t => t !== toast);
+              toast.destroy();
+              this.updateToastPositions();
+            }
+          });
+        });
+      }
+    });
+  }
+
+  // Keep toasts positioned correctly when they're removed
+  updateToastPositions() {
+    const { height } = this.game.config;
+    this.toasts.forEach((toast, index) => {
+      this.tweens.add({
+        targets: toast,
+        y: height - 100 - (index * 80),
+        duration: 200,
+        ease: 'Power2'
+      });
+    });
+  }
 
    /* ───────────────────────── UI helpers ───────────────────────── */
   toggleLeaderboard() {

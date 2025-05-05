@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Achievements - Tag Royale</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .achievements-container {
+            max-width: 800px;
+            margin: 30px auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+
+        .achievement-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .achievement-card {
+            background-color: #f8f8f8;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .achievement-card.unlocked {
+            background-color: #f0f7ff;
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+        }
+
+        .achievement-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #aaa;
+            transition: color 0.3s ease;
+        }
+
+        .achievement-card.unlocked .achievement-icon {
+            color: #f1c40f;
+            animation: shine 1.5s infinite alternate;
+        }
+
+        .achievement-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .achievement-description {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .achievement-date {
+            font-size: 12px;
+            color: #3498db;
+            font-style: italic;
+        }
+
+        .achievement-locked {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .back-button {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 10px 15px;
+            background-color: #3498db;
+            color: white;
+            border-radius: 5px;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+
+        .back-button:hover {
+            background-color: #2980b9;
+        }
+
+        @keyframes shine {
+            from {
+                text-shadow: 0 0 5px rgba(241, 196, 15, 0.5);
+            }
+            to {
+                text-shadow: 0 0 15px rgba(241, 196, 15, 0.8), 0 0 20px rgba(241, 196, 15, 0.5);
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .loading i {
+            font-size: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Tag Royale</h1>
+            <p>Your Achievements</p>
+        </header>
+
+        <div class="achievements-container">
+            <a href="/" class="back-button"><i class="fas fa-arrow-left"></i> Back to Home</a>
+
+            <h2>Your Achievements</h2>
+
+            <div id="achievements-loading" class="loading">
+                <i class="fas fa-spinner"></i>
+                <p>Loading your achievements...</p>
+            </div>
+
+            <div id="achievements-list" class="achievement-list" style="display: none;">
+                <!-- Achievement cards will be added here dynamically -->
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2025 Tag Royale - CSE 312 Project</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+        const achievementsList = document.getElementById('achievements-list');
+        const loadingElement = document.getElementById('achievements-loading');
+
+        // Check if user is logged in
+        const checkAuth = async () => {
+            try {
+                const res = await fetch('/api/current-user');
+                if (!res.ok) {
+                    window.location.href = '/'; // Redirect to login page
+                    return false;
+                }
+                return true;
+            } catch (err) {
+                console.error('Auth check failed:', err);
+                window.location.href = '/';
+                return false;
+            }
+        };
+
+        // Fetch achievements data
+        const fetchAchievements = async () => {
+            try {
+                const res = await fetch('/api/achievements');
+                if (!res.ok) {
+                    throw new Error('Failed to fetch achievements');
+                }
+
+                const achievements = await res.json();
+                return achievements;
+            } catch (err) {
+                console.error('Error fetching achievements:', err);
+                return {};
+            }
+        };
+
+        // Render achievements
+        const renderAchievements = (achievements) => {
+            loadingElement.style.display = 'none';
+            achievementsList.style.display = 'grid';
+
+            const achievementTypes = [
+                'first_tag',
+                'survivor_10min',
+                'survivor_1hour'
+            ];
+
+            achievementTypes.forEach(type => {
+                const achievement = achievements[type] || {};
+                const unlocked = achievement.unlocked || false;
+                const name = achievement.name || getDefaultName(type);
+                const description = achievement.description || getDefaultDescription(type);
+                const unlockDate = achievement.unlockDate ? new Date(achievement.unlockDate) : null;
+
+                // Choose the appropriate icon based on achievement type
+                let iconClass = 'fa-trophy';
+                if (type === 'first_tag') {
+                    iconClass = 'fa-tag';
+                } else if (type === 'survivor_10min') {
+                    iconClass = 'fa-stopwatch';
+                } else if (type === 'survivor_1hour') {
+                    iconClass = 'fa-medal';
+                }
+
+                // Use solid icon for unlocked and regular for locked
+                const iconStyle = unlocked ? 'fas' : 'far';
+
+                const card = document.createElement('div');
+                card.className = `achievement-card ${unlocked ? 'unlocked' : ''}`;
+                card.innerHTML = `
+                    <div class="achievement-icon">
+                        <i class="${iconStyle} ${iconClass}"></i>
+                    </div>
+                    <div class="achievement-title">${name}</div>
+                    <div class="achievement-description">${description}</div>
+                    ${unlocked
+                        ? `<div class="achievement-date">Unlocked: ${formatDate(unlockDate)}</div>`
+                        : `<div class="achievement-locked">Not yet unlocked</div>`
+                    }
+                `;
+
+                achievementsList.appendChild(card);
+            });
+        };
+
+        // Helper functions
+        function getDefaultName(type) {
+            switch(type) {
+                case 'first_tag': return 'First Tag';
+                case 'survivor_10min': return '10-Minute Survivor';
+                case 'survivor_1hour': return 'Ultimate Survivor';
+                default: return 'Unknown Achievement';
+            }
+        }
+
+        function getDefaultDescription(type) {
+            switch(type) {
+                case 'first_tag': return 'Tag another player for the first time';
+                case 'survivor_10min': return 'Stay as "it" for 10 minutes total';
+                case 'survivor_1hour': return 'Stay as "it" for 1 hour total';
+                default: return 'Complete this achievement to find out more';
+            }
+        }
+
+        function formatDate(date) {
+            if (!date) return 'Unknown date';
+
+            const options = {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            };
+
+            return date.toLocaleDateString(undefined, options);
+        }
+
+        // Initialize
+        const init = async () => {
+            const isAuthenticated = await checkAuth();
+            if (isAuthenticated) {
+                const achievements = await fetchAchievements();
+                renderAchievements(achievements);
+            }
+        };
+
+        init();
+    });
+    </script>
+</body>
+</html>

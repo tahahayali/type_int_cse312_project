@@ -11,7 +11,7 @@ export function loadAvatarTexture(scene, key, url) {
     const blob   = await resp.blob();
     const b64url = await new Promise(res => {
       const fr = new FileReader();
-      fr.onload = () => res(fr.result);       // “data:image/png;base64,…”
+      fr.onload = () => res(fr.result);       // "data:image/png;base64,…"
       fr.readAsDataURL(blob);
     });
 
@@ -49,6 +49,10 @@ export default class Network {
     this.socket.on('playerLeft',            data => this.remove(data));
     this.socket.on('tagUpdate',             data => this.updateTags(data));
     this.socket.on('leaderboardUpdate',     data => this.updateLeaderboard(data));
+    this.socket.on('achievementUnlocked', data => this.handleAchievement(data));
+    this.socket.on('achievementsUpdate',    data => this.updateAchievements(data));
+
+    console.log("Network initialized, listening for achievements");
   }
 
   /* ── first snapshot ─────────────────────────────────────── */
@@ -65,6 +69,14 @@ export default class Network {
     /* create leaderboard UI once */
     if (!this.scene.leaderboard) this.createLeaderboardUI();
     this.updateActivePlayers();
+
+    // Request current achievements
+    this.requestAchievements();
+
+    // Update status text if available
+    if (this.scene.updateStatusText) {
+      this.scene.updateStatusText();
+    }
   }
 
   /* ── spawn (first time or on join) ───────────────────────── */
@@ -149,10 +161,32 @@ export default class Network {
     this.updateLeaderboardUI();
   }
 
+  /* ── achievement handling ──────────────────────────────── */
+  handleAchievement(data) {
+    console.log('Achievement unlocked event received:', data);
+
+    // Pass to the scene to show toast notification
+    if (this.scene && this.scene.showAchievementToast) {
+      this.scene.showAchievementToast(data);
+    } else {
+      console.error('No showAchievementToast method available in scene');
+    }
+  }
+
+  updateAchievements(data) {
+    console.log('Achievements data received:', data);
+    // This is used to display achievements in the panel
+    // Not needed now, but we'll store it for future expansion
+  }
+
   /* ── client → server ───────────────────────────────────── */
   sendMove(x, y) { this.socket.emit('move', { x, y }); }
   sendTag(id)    { this.socket.emit('tag',  { id });   }
   requestLeaderboard() { this.socket.emit('getLeaderboard'); }
+  requestAchievements() {
+    console.log("Requesting achievements from server");
+    this.socket.emit('getAchievements');
+  }
 
   /* ── helper: active players to DOM ─────────────────────── */
   updateActivePlayers() {
@@ -160,229 +194,248 @@ export default class Network {
     if (window.updateActivePlayers) window.updateActivePlayers(active);
   }
 
-    /* ---------- leaderboard UI ---------- */
-    createLeaderboardUI() {
-        const { width, height } = this.scene.game.config;
+  /* ---------- leaderboard UI ---------- */
+  createLeaderboardUI() {
+    const { width, height } = this.scene.game.config;
 
-        // Create toggle button
-        const toggleButton = this.scene.add.text(width - 200, 20, "Show Leaderboard", {
-            fontSize: '18px',
-            backgroundColor: '#333',
-            padding: { x: 10, y: 5 },
-            color: '#fff'
-        })
-        .setScrollFactor(0)
-        .setDepth(1000)
-        .setInteractive({ useHandCursor: true });
+    // Create toggle button
+    const toggleButton = this.scene.add.text(width - 200, 20, "Show Leaderboard", {
+      fontSize: '18px',
+      backgroundColor: '#333',
+      padding: { x: 10, y: 5 },
+      color: '#fff'
+    })
+    .setScrollFactor(0)
+    .setDepth(1000)
+    .setInteractive({ useHandCursor: true });
 
-        toggleButton.on('pointerdown', () => {
-            this.leaderboardVisible = !this.leaderboardVisible;
-            toggleButton.setText(this.leaderboardVisible ? "Hide Leaderboard" : "Show Leaderboard");
-            this.updateLeaderboardUI();
-        });
+    toggleButton.on('pointerdown', () => {
+      this.leaderboardVisible = !this.leaderboardVisible;
+      toggleButton.setText(this.leaderboardVisible ? "Hide Leaderboard" : "Show Leaderboard");
+      this.updateLeaderboardUI();
+    });
 
-        // Create leaderboard container
-        const leaderboardBg = this.scene.add.rectangle(
-            width - 175,
-            height / 2,
-            300,
-            400,
-            0x000000,
-            0.7
-        )
-        .setScrollFactor(0)
-        .setDepth(999)
-        .setVisible(false);
+    // Create leaderboard container
+    const leaderboardBg = this.scene.add.rectangle(
+      width - 175,
+      height / 2,
+      300,
+      400,
+      0x000000,
+      0.7
+    )
+    .setScrollFactor(0)
+    .setDepth(999)
+    .setVisible(false);
 
-        const leaderboardTitle = this.scene.add.text(
-            width - 175,
-            height / 2 - 180,
-            "LEADERBOARD",
-            {
-                fontSize: '24px',
-                fontStyle: 'bold',
-                color: '#ffffff'
-            }
-        )
-        .setOrigin(0.5)
-        .setScrollFactor(0)
-        .setDepth(1000)
-        .setVisible(false);
+    const leaderboardTitle = this.scene.add.text(
+      width - 175,
+      height / 2 - 180,
+      "LEADERBOARD",
+      {
+        fontSize: '24px',
+        fontStyle: 'bold',
+        color: '#ffffff'
+      }
+    )
+    .setOrigin(0.5)
+    .setScrollFactor(0)
+    .setDepth(1000)
+    .setVisible(false);
 
-        const leaderboardSubtitle = this.scene.add.text(
-            width - 175,
-            height / 2 - 150,
-            "Time spent as 'IT'",
-            {
-                fontSize: '16px',
-                color: '#ffffff'
-            }
-        )
-        .setOrigin(0.5)
-        .setScrollFactor(0)
-        .setDepth(1000)
-        .setVisible(false);
+    const leaderboardSubtitle = this.scene.add.text(
+      width - 175,
+      height / 2 - 150,
+      "Time spent as 'IT'",
+      {
+        fontSize: '16px',
+        color: '#ffffff'
+      }
+    )
+    .setOrigin(0.5)
+    .setScrollFactor(0)
+    .setDepth(1000)
+    .setVisible(false);
 
-        // Create slots for player entries
-        const entries = [];
-        for (let i = 0; i < 10; i++) {
-            const y = height / 2 - 110 + (i * 40);
-            const rank = this.scene.add.text(
-                width - 305,
-                y,
-                `${i+1}.`,
-                { fontSize: '16px', color: '#ffffff' }
-            )
-            .setScrollFactor(0)
-            .setDepth(1000)
-            .setVisible(false);
+    // Create slots for player entries
+    const entries = [];
+    for (let i = 0; i < 10; i++) {
+      const y = height / 2 - 110 + (i * 40);
+      const rank = this.scene.add.text(
+        width - 305,
+        y,
+        `${i+1}.`,
+        { fontSize: '16px', color: '#ffffff' }
+      )
+      .setScrollFactor(0)
+      .setDepth(1000)
+      .setVisible(false);
 
-            const name = this.scene.add.text(
-                width - 275,
-                y,
-                "-",
-                { fontSize: '16px', color: '#ffffff' }
-            )
-            .setScrollFactor(0)
-            .setDepth(1000)
-            .setVisible(false);
+      const name = this.scene.add.text(
+        width - 275,
+        y,
+        "-",
+        { fontSize: '16px', color: '#ffffff' }
+      )
+      .setScrollFactor(0)
+      .setDepth(1000)
+      .setVisible(false);
 
-            const time = this.scene.add.text(
-                width - 75,
-                y,
-                "-",
-                { fontSize: '16px', color: '#ffffff', align: 'right' }
-            )
-            .setScrollFactor(0)
-            .setDepth(1000)
-            .setVisible(false);
+      const time = this.scene.add.text(
+        width - 75,
+        y,
+        "-",
+        { fontSize: '16px', color: '#ffffff', align: 'right' }
+      )
+      .setScrollFactor(0)
+      .setDepth(1000)
+      .setVisible(false);
 
-            entries.push({ rank, name, time });
-        }
-
-        this.scene.leaderboard = {
-            toggleButton,
-            background: leaderboardBg,
-            title: leaderboardTitle,
-            subtitle: leaderboardSubtitle,
-            entries
-        };
+      entries.push({ rank, name, time });
     }
 
-    updateLeaderboardUI() {
-        this.updateActivePlayers();
-        if (!this.scene.leaderboard) return;
+    this.scene.leaderboard = {
+      toggleButton,
+      background: leaderboardBg,
+      title: leaderboardTitle,
+      subtitle: leaderboardSubtitle,
+      entries
+    };
+  }
 
-        const { toggleButton, background, title, subtitle, entries } = this.scene.leaderboard;
+  updateLeaderboardUI() {
+    this.updateActivePlayers();
+    if (!this.scene.leaderboard) return;
 
-        // Show/hide the leaderboard
-        background.setVisible(this.leaderboardVisible);
-        title.setVisible(this.leaderboardVisible);
-        subtitle.setVisible(this.leaderboardVisible);
+    const { toggleButton, background, title, subtitle, entries } = this.scene.leaderboard;
 
-        if (!this.leaderboardVisible) {
-            entries.forEach(entry => {
-                entry.rank.setVisible(false);
-                entry.name.setVisible(false);
-                entry.time.setVisible(false);
-            });
+    // Show/hide the leaderboard
+    background.setVisible(this.leaderboardVisible);
+    title.setVisible(this.leaderboardVisible);
+    subtitle.setVisible(this.leaderboardVisible);
 
-            // Also update DOM leaderboard visibility
-            const domLeaderboard = document.getElementById('leaderboard');
-            const domToggle = document.getElementById('leaderboard-toggle');
-            if (domLeaderboard && domToggle) {
-                domLeaderboard.classList.remove('visible');
-                domToggle.textContent = 'Show Leaderboard';
-            }
-            return;
+    if (!this.leaderboardVisible) {
+      entries.forEach(entry => {
+        entry.rank.setVisible(false);
+        entry.name.setVisible(false);
+        entry.time.setVisible(false);
+      });
+
+      // Also update DOM leaderboard visibility
+      const domLeaderboard = document.getElementById('leaderboard');
+      const domToggle = document.getElementById('leaderboard-toggle');
+      if (domLeaderboard && domToggle) {
+        domLeaderboard.classList.remove('visible');
+        domToggle.textContent = 'Show Leaderboard';
+      }
+      return;
+    } else {
+      // Update DOM leaderboard visibility
+      const domLeaderboard = document.getElementById('leaderboard');
+      const domToggle = document.getElementById('leaderboard-toggle');
+      if (domLeaderboard && domToggle) {
+        domLeaderboard.classList.add('visible');
+        domToggle.textContent = 'Hide Leaderboard';
+      }
+    }
+
+    // Format and sort player times
+    const sortedPlayers = [];
+    const leaderboardData = {};
+
+    // Only include active players with non-zero times
+    for (const id in this.itTimes) {
+      // Skip players who aren't active (not in players object)
+      if (id !== this.myID && !this.players[id]) {
+        continue;
+      }
+
+      const time = this.itTimes[id];
+      let totalTime = time.total || 0;
+
+      // Add current time if this player is currently "it"
+      if (time.started_at) {
+        totalTime += (Date.now() / 1000) - time.started_at;
+      }
+
+      // Find player name
+      let name = id.slice(0, 4); // Default to ID
+      if (id === this.myID) {
+        name = localStorage.getItem('tag_username') || 'You';
+      } else if (this.players[id] && this.players[id].label) {
+        name = this.players[id].label.text;
+      }
+
+      sortedPlayers.push({
+        id,
+        name,
+        time: totalTime,
+        isCurrentPlayer: id === this.myID
+      });
+
+      // Add to data for DOM leaderboard
+      leaderboardData[id] = {
+        ...time,
+        name,
+        isCurrentPlayer: id === this.myID
+      };
+    }
+
+    // Sort by time (longest first)
+    sortedPlayers.sort((a, b) => b.time - a.time);
+
+    // Update Phaser leaderboard entries
+    entries.forEach((entry, i) => {
+      if (i < sortedPlayers.length) {
+        const player = sortedPlayers[i];
+
+        // Format time as minutes:seconds
+        const minutes = Math.floor(player.time / 60);
+        const seconds = Math.floor(player.time % 60);
+        const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        entry.rank.setText(`${i+1}.`).setVisible(true);
+        entry.name.setText(player.name).setVisible(true);
+        entry.time.setText(timeText).setVisible(true);
+
+        // Highlight current player
+        if (player.isCurrentPlayer) {
+          entry.name.setColor('#ffff00');
+          entry.time.setColor('#ffff00');
         } else {
-            // Update DOM leaderboard visibility
-            const domLeaderboard = document.getElementById('leaderboard');
-            const domToggle = document.getElementById('leaderboard-toggle');
-            if (domLeaderboard && domToggle) {
-                domLeaderboard.classList.add('visible');
-                domToggle.textContent = 'Hide Leaderboard';
-            }
+          entry.name.setColor('#ffffff');
+          entry.time.setColor('#ffffff');
         }
+      } else {
+        entry.rank.setVisible(false);
+        entry.name.setVisible(false);
+        entry.time.setVisible(false);
+      }
+    });
 
-        // Format and sort player times
-        const sortedPlayers = [];
-        const leaderboardData = {};
+    // Update DOM leaderboard if available
+    if (window.updateDOMLeaderboard) {
+      window.updateDOMLeaderboard(leaderboardData);
+    }
+  }
 
-        // Only include active players with non-zero times
-        for (const id in this.itTimes) {
-            // Skip players who aren't active (not in players object)
-            if (id !== this.myID && !this.players[id]) {
-                continue;
-            }
+  updateActivePlayers() {
+    // Create a map of active player IDs
+    const activePlayers = {};
 
-            const time = this.itTimes[id];
-            let totalTime = time.total || 0;
-
-            // Add current time if this player is currently "it"
-            if (time.started_at) {
-                totalTime += (Date.now() / 1000) - time.started_at;
-            }
-
-            // Find player name
-            let name = id.slice(0, 4); // Default to ID
-            if (id === this.myID) {
-                name = localStorage.getItem('tag_username') || 'You';
-            } else if (this.players[id] && this.players[id].label) {
-                name = this.players[id].label.text;
-            }
-
-            sortedPlayers.push({
-                id,
-                name,
-                time: totalTime,
-                isCurrentPlayer: id === this.myID
-            });
-
-            // Add to data for DOM leaderboard
-            leaderboardData[id] = {
-                ...time,
-                name,
-                isCurrentPlayer: id === this.myID
-            };
-        }
-
-        // Sort by time (longest first)
-        sortedPlayers.sort((a, b) => b.time - a.time);
-
-        // Update Phaser leaderboard entries
-        entries.forEach((entry, i) => {
-            if (i < sortedPlayers.length) {
-                const player = sortedPlayers[i];
-
-                // Format time as minutes:seconds
-                const minutes = Math.floor(player.time / 60);
-                const seconds = Math.floor(player.time % 60);
-                const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-                entry.rank.setText(`${i+1}.`).setVisible(true);
-                entry.name.setText(player.name).setVisible(true);
-                entry.time.setText(timeText).setVisible(true);
-
-                // Highlight current player
-                if (player.isCurrentPlayer) {
-                    entry.name.setColor('#ffff00');
-                    entry.time.setColor('#ffff00');
-                } else {
-                    entry.name.setColor('#ffffff');
-                    entry.time.setColor('#ffffff');
-                }
-            } else {
-                entry.rank.setVisible(false);
-                entry.name.setVisible(false);
-                entry.time.setVisible(false);
-            }
-        });
-
-        // Update DOM leaderboard if available
-        if (window.updateDOMLeaderboard) {
-            window.updateDOMLeaderboard(leaderboardData);
-        }
+    // Add all current players to the active players list
+    for (const id in this.players) {
+      activePlayers[id] = true;
     }
 
+    // Also add the current player
+    if (this.myID) {
+      activePlayers[this.myID] = true;
+    }
+
+    // Update the DOM with active players if the function exists
+    if (window.updateActivePlayers) {
+      window.updateActivePlayers(activePlayers);
+    }
+  }
 }

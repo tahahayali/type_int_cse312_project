@@ -54,10 +54,37 @@
       font-family: monospace;
       margin-right: 5px;
     }
+    /* Home button styles */
+    .home-button {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 8px 15px;
+      border-radius: 5px;
+      font-family: 'Arial', sans-serif;
+      z-index: 1000;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      transition: background-color 0.2s;
+    }
+    .home-button:hover {
+      background-color: rgba(40, 40, 40, 0.9);
+    }
+    .home-button i {
+      margin-right: 5px;
+    }
   </style>
 </head>
 <body>
   <div id="game-container"></div>
+
+  <!-- Added a styled home button in the bottom right -->
+  <a href="/" class="home-button">
+    <i class="fas fa-home"></i> Home
+  </a>
 
   <!-- DOM-based Leaderboard (hidden by default) -->
   <div class="leaderboard" id="leaderboard">
@@ -107,81 +134,58 @@
     };
 
     // Function that will be called from the game code to update the DOM leaderboard
-window.updateDOMLeaderboard = function(leaderboardData) {
+    window.updateDOMLeaderboard = function(leaderboardData) {
+      console.log("Received leaderboard:", leaderboardData);
+      leaderboardList.innerHTML = '';
 
-  console.log("Received leaderboard:", leaderboardData);
+      const sortedPlayers = [];
+      for (const id in leaderboardData) {
+        if (!leaderboardData[id].isCurrentPlayer && !activePlayers[id]) {
+          continue;
+        }
 
+        const player = leaderboardData[id];
+        let totalTime = player.total || 0;
 
-  leaderboardList.innerHTML = '';
+        if (player.it && player.started_at) {
+          totalTime += (Date.now() / 1000) - player.started_at;
+        }
 
-  const sortedPlayers = [];
-  for (const id in leaderboardData) {
-    if (!leaderboardData[id].isCurrentPlayer && !activePlayers[id]) {
-      continue;
-    }
+        sortedPlayers.push({
+          id,
+          name: player.name || id.slice(0, 4),
+          time: totalTime,
+          isCurrentPlayer: player.isCurrentPlayer,
+          it: player.it,
+          started_at: player.started_at
+        });
+      }
 
-    const player = leaderboardData[id];
-    let totalTime = player.total || 0;
+      sortedPlayers.sort((a, b) => b.time - a.time);
 
+      sortedPlayers.forEach((player, index) => {
+        const li = document.createElement('li');
+        li.className = 'leaderboard-item';
+        if (player.isCurrentPlayer) {
+          li.classList.add('current-player');
+        }
 
-    if (player.it && player.started_at) {
-      totalTime += (Date.now() / 1000) - player.started_at;
-    }
+        const minutes = Math.floor(player.time / 60);
+        const seconds = Math.floor(player.time % 60);
+        const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-    sortedPlayers.push({
-  id,
-  name: player.name || id.slice(0, 4),
-  time: totalTime,
-  isCurrentPlayer: player.isCurrentPlayer,
-  it: player.it,
-  started_at: player.started_at
-});
-  }
-
-  sortedPlayers.sort((a, b) => b.time - a.time);
-
-  sortedPlayers.forEach((player, index) => {
-    const li = document.createElement('li');
-    li.className = 'leaderboard-item';
-    if (player.isCurrentPlayer) {
-      li.classList.add('current-player');
-    }
-
-    const minutes = Math.floor(player.time / 60);
-    const seconds = Math.floor(player.time % 60);
-    const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-    li.innerHTML = `
-      <div class="leaderboard-rank">${index + 1}.</div>
-      <div class="leaderboard-name">${player.name}</div>
-      <div class="leaderboard-time">${timeText}</div>
-    `;
-    leaderboardList.appendChild(li);
-  });
-};
-
+        li.innerHTML = `
+          <div class="leaderboard-rank">${index + 1}.</div>
+          <div class="leaderboard-name">${player.name}</div>
+          <div class="leaderboard-time">${timeText}</div>
+        `;
+        leaderboardList.appendChild(li);
+      });
+    };
   </script>
 
   <script type="module">
     import './js/tag_game.js';
   </script>
-
-
-<a href="/" class="btn" style="
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 9999;
-  background-color: #333;
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 6px;
-  text-decoration: none;
-  font-family: Arial, sans-serif;
-  font-size: 14px;
-">← Back to Home</a>
-
-
-
 </body>
 </html>
