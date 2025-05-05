@@ -1,5 +1,6 @@
 import eventlet
-from db.database import get_leaderboard, get_aggregated_leaderboard, get_user_achievements
+from db.database import get_aggregated_leaderboard, get_user_achievements
+from db.database import get_leaderboard as db_get_leaderboard
 eventlet.monkey_patch()
 
 import os
@@ -42,19 +43,36 @@ from db.database import users
 
 # =================== Authentication Routes ===================
 
+def _longest_streak(username: str) -> int:
+    """Return longestStreak for *username* from the leaderboard collection."""
+    for row in db_get_leaderboard():  # [{'user': 'ahmed', 'longestStreak': 410}, ...]
+        if row["user"] == username:
+            return int(row.get("longestStreak", 0))
+    return 0
 
-# Register a new user
-@app.route('/api/stats/<username>')
-@token_required
-def get_stats(username):
-    """Return totalTags, totalTimeIt, longestStreak for a given user."""
-    doc = users.find_one(
+def _stats_payload(username: str):
+    """Merge data from ``users`` + longest‑streak board into a single dict."""
+    base = users.find_one(
         {"username": username},
-        {"_id": 0, "username": 1, "totalTags": 1, "totalTimeIt": 1, "longestStreak": 1}
+        {"_id": 0, "username": 1, "totalTags": 1, "totalTimeIt": 1},
     )
-    if not doc:
+    if not base:
+        return None
+
+    base["longestStreak"] = _longest_streak(username)
+    # provide defaults so keys always exist
+    base.setdefault("totalTags", 0)
+    base.setdefault("totalTimeIt", 0.0)
+    return base
+
+@app.get("/api/stats/<username>")
+@token_required
+def stats(username: str):
+    payload = _stats_payload(username)
+    if payload is None:
         return jsonify(error="User not found"), 404
-    return jsonify(doc), 200
+    return jsonify(payload), 200
+
 
 
 @app.route('/api/leaderboard')
@@ -165,7 +183,7 @@ def fallback(path):
 
 @app.route("/leaderboard", methods=["GET"])
 def longest_streak_leaderboard():
-    leaderboard_data = get_leaderboard()
+    leaderboard_data = db_get_leaderboard()
     return jsonify(leaderboard_data)
 # =================== Server Start ===================
 
