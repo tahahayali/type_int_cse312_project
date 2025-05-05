@@ -41,7 +41,7 @@ from datetime import datetime
 import os
 
 MONGO_URI = os.environ.get("MONGODB_URI", "mongodb://localhost:27017/")
-client = MongoClient(MONGO_URI)
+client = MongoClient("mongodb://mongo:27017/")
 db = client["tag_game"]
 
 users          = db["users"]
