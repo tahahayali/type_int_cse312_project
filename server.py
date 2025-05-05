@@ -1,4 +1,5 @@
 import eventlet
+from db.database import get_leaderboard, get_aggregated_leaderboard
 eventlet.monkey_patch()
 
 import os
@@ -58,15 +59,11 @@ def get_stats(username):
 @app.route('/api/leaderboard')
 def get_leaderboard():
     """
-    Return top 50 users sorted by totalTimeIt ascending
-    (least time as it wins).
+    Aggregated leaderboard (Mongo pipeline):
+    - Includes totalTags, totalTimeIt, tagsPerMinute
+    - Sorted by least totalTimeIt
     """
-    cursor = users.find(
-        {},
-        {"_id": 0, "username": 1, "totalTags": 1, "totalTimeIt": 1}
-    ).sort("totalTimeIt",  1).limit(50)
-
-    board = list(cursor)
+    board = get_aggregated_leaderboard(limit=50)
     return jsonify(board), 200
 
 
@@ -145,3 +142,8 @@ def fallback(path):
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=8080)
 # ---------------------------
+
+@app.route("/leaderboard", methods=["GET"])
+def longest_streak_leaderboard():
+    leaderboard_data = get_leaderboard()
+    return jsonify(leaderboard_data)

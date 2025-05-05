@@ -4,9 +4,10 @@ from typing import Optional
 
 from flask import request
 from flask_socketio import emit
-from db.database import sessions, update_user_time_as_it, unlock_achievement
+from db.database import sessions, update_user_time_as_it, unlock_achievement, update_leaderboard
 import jwt as pyjwt
 import os
+
 
 # Globals set by init_handlers
 socketio = None
@@ -119,6 +120,9 @@ def init_handlers(sock):
             increment_user_tags(players[tagger]['name'], 1)
             # add elapsed “it” time for the previous it‐player
             increment_user_time(players[target]['name'], elapsed)
+            # update leaderboard if this was a new personal best
+            update_leaderboard(players[target]['name'], int(it_times[target]['total']))
+
 
         # ───────── Start TAGGER’s timer ─────────
         it_times.setdefault(tagger, {'total': 0})
@@ -156,6 +160,7 @@ def init_handlers(sock):
             elapsed = time.time() - start
             it_times[sid]['total'] += elapsed
             update_user_time_as_it(players[sid]['name'], it_times[sid]['total'])
+            update_leaderboard(players[sid]['name'], int(it_times[sid]['total']))
 
         # Clean up
         players.pop(sid, None)
