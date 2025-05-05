@@ -150,13 +150,13 @@ def increment_user_time(username, seconds):
     unlocked = []
 
     # Check for time-based achievements
-    if total_time >= 10:  # 10 minutes (600 seconds)
+    if total_time >= 600:  # 10 minutes (600 seconds)
         print(f"User {username} qualifies for 10-minute achievement")
         if unlock_achievement(username, "survivor_10min"):
             print(f"Unlocked 10-minute achievement for {username}")
             unlocked.append("survivor_10min")
 
-    if total_time >= 30:  # 1 hour (3600 seconds)
+    if total_time >= 3600:  # 1 hour (3600 seconds)
         print(f"User {username} qualifies for 1-hour achievement")
         if unlock_achievement(username, "survivor_1hour"):
             print(f"Unlocked 1-hour achievement for {username}")

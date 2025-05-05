@@ -197,16 +197,24 @@
                 const description = achievement.description || getDefaultDescription(type);
                 const unlockDate = achievement.unlockDate ? new Date(achievement.unlockDate) : null;
 
+                // Choose the appropriate icon based on achievement type
+                let iconClass = 'fa-trophy';
+                if (type === 'first_tag') {
+                    iconClass = 'fa-tag';
+                } else if (type === 'survivor_10min') {
+                    iconClass = 'fa-stopwatch';
+                } else if (type === 'survivor_1hour') {
+                    iconClass = 'fa-medal';
+                }
+
+                // Use solid icon for unlocked and regular for locked
+                const iconStyle = unlocked ? 'fas' : 'far';
+
                 const card = document.createElement('div');
                 card.className = `achievement-card ${unlocked ? 'unlocked' : ''}`;
-
-                // Use different icon based on unlocked status
-                const iconClass = unlocked ? 'fas fa-star' : 'far fa-star';
-                const iconColor = unlocked ? '#f1c40f' : '#aaa';
-
                 card.innerHTML = `
                     <div class="achievement-icon">
-                        <i class="${iconClass}" style="color: ${iconColor};"></i>
+                        <i class="${iconStyle} ${iconClass}"></i>
                     </div>
                     <div class="achievement-title">${name}</div>
                     <div class="achievement-description">${description}</div>
