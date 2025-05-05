@@ -4,6 +4,7 @@ import requests
 from datetime import datetime, timedelta, timezone
 from flask import request, jsonify, make_response
 from db.database import users, sessions
+from db.database import users, sessions, initialize_player_stats
 from util.backend.logger import log_auth_attempt
 import jwt as pyjwt
 
@@ -56,6 +57,9 @@ def register():
         "password": pw_hash,
         "created_at": datetime.now(timezone.utc)
     })
+
+    # Initialize player stats
+    initialize_player_stats(username)
 
     # Generate default Dicebear avatar
     download_dicebear_avatar(username)

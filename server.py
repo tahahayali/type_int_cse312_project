@@ -23,6 +23,9 @@ app.after_request(log_raw_http)
 #socketio = SocketIO(app, cors_allowed_origins="*")  # Allow all origins during dev
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
+
+
+
 # --- add these two lines ---
 from util.backend.socket_handlers import init_handlers
 init_handlers(socketio)
@@ -32,7 +35,43 @@ from util.backend import socket_server
 # Secret Key
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev_secret_key")
 
+
+
+from db.database import users
+
 # =================== Authentication Routes ===================
+
+
+# Register a new user
+@app.route('/api/stats/<username>')
+@token_required
+def get_stats(username):
+    """Return totalTags & totalTimeIt for a given user."""
+    doc = users.find_one(
+        {"username": username},
+        {"_id": 0, "username": 1, "totalTags": 1, "totalTimeIt": 1}
+    )
+    if not doc:
+        return jsonify(error="User not found"), 404
+    return jsonify(doc), 200
+
+@app.route('/api/leaderboard')
+def get_leaderboard():
+    """
+    Return top 50 users sorted by totalTimeIt ascending
+    (least time as it wins).
+    """
+    cursor = users.find(
+        {},
+        {"_id": 0, "username": 1, "totalTags": 1, "totalTimeIt": 1}
+    ).sort("totalTimeIt",  1).limit(50)
+
+    board = list(cursor)
+    return jsonify(board), 200
+
+
+#_____________________________________________________________________
+
 
 @app.post('/register')
 def register_route():

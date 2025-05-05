@@ -352,32 +352,76 @@ def init_handlers(sock):
 
         print(f"Player connected: {sid} ({username}), it={is_it}")
 
+    # @socketio.on('tag')
+    # def _tag(data):
+    #     tagger = request.sid
+    #     target = data.get('id')
+    #     now = time.time()
+    #
+    #     if tagger not in players or target not in players:
+    #         return
+    #     if not players[target]['it']:
+    #         return
+    #     if target in became_it_time and now - became_it_time[target] < TAG_COOLDOWN:
+    #         return
+    #
+    #     # stop TARGET’s timer
+    #     if it_times[target].get('started_at'):
+    #         it_times[target]['total'] += now - it_times[target]['started_at']
+    #         it_times[target]['started_at'] = None
+    #
+    #     # start TAGGER’s timer
+    #     it_times.setdefault(tagger, {'total': 0})
+    #     it_times[tagger]['started_at'] = now
+    #
+    #     players[target]['it'] = False
+    #     players[tagger]['it'] = True
+    #     became_it_time[tagger] = now
+    #
+    #     emit('tagUpdate', {'newIt': tagger, 'prevIt': target}, broadcast=True)
+    #     emit('leaderboardUpdate', {'it_times': build_enriched_it_times()}, broadcast=True)
     @socketio.on('tag')
     def _tag(data):
         tagger = request.sid
         target = data.get('id')
         now = time.time()
 
+        # ─────────── Validation ───────────
+        # Both sides must be connected
         if tagger not in players or target not in players:
             return
+
+        # Only bump the current “it” player
         if not players[target]['it']:
             return
+
+        # Enforce cooldown on newly-tagged
         if target in became_it_time and now - became_it_time[target] < TAG_COOLDOWN:
             return
 
-        # stop TARGET’s timer
+        # ───────── Stop TARGET’s timer ─────────
         if it_times[target].get('started_at'):
-            it_times[target]['total'] += now - it_times[target]['started_at']
+            elapsed = now - it_times[target]['started_at']
+            it_times[target]['total'] += elapsed
             it_times[target]['started_at'] = None
 
-        # start TAGGER’s timer
+            # ─────── record in Mongo ───────
+            from db.database import increment_user_tags, increment_user_time
+            # tagger gains one tag
+            increment_user_tags(players[tagger]['name'], 1)
+            # add elapsed “it” time for the previous it‐player
+            increment_user_time(players[target]['name'], elapsed)
+
+        # ───────── Start TAGGER’s timer ─────────
         it_times.setdefault(tagger, {'total': 0})
         it_times[tagger]['started_at'] = now
 
+        # Swap “it” flags
         players[target]['it'] = False
         players[tagger]['it'] = True
         became_it_time[tagger] = now
 
+        # ───────── Broadcast updates ─────────
         emit('tagUpdate', {'newIt': tagger, 'prevIt': target}, broadcast=True)
         emit('leaderboardUpdate', {'it_times': build_enriched_it_times()}, broadcast=True)
 
