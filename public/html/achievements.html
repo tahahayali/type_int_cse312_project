@@ -144,121 +144,126 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const achievementsList = document.getElementById('achievements-list');
-            const loadingElement = document.getElementById('achievements-loading');
+        const achievementsList = document.getElementById('achievements-list');
+        const loadingElement = document.getElementById('achievements-loading');
 
-            // Check if user is logged in
-            const checkAuth = async () => {
-                try {
-                    const res = await fetch('/api/current-user');
-                    if (!res.ok) {
-                        window.location.href = '/'; // Redirect to login page
-                        return false;
-                    }
-                    return true;
-                } catch (err) {
-                    console.error('Auth check failed:', err);
-                    window.location.href = '/';
+        // Check if user is logged in
+        const checkAuth = async () => {
+            try {
+                const res = await fetch('/api/current-user');
+                if (!res.ok) {
+                    window.location.href = '/'; // Redirect to login page
                     return false;
                 }
-            };
+                return true;
+            } catch (err) {
+                console.error('Auth check failed:', err);
+                window.location.href = '/';
+                return false;
+            }
+        };
 
-            // Fetch achievements data
-            const fetchAchievements = async () => {
-                try {
-                    const res = await fetch('/api/achievements');
-                    if (!res.ok) {
-                        throw new Error('Failed to fetch achievements');
+        // Fetch achievements data
+        const fetchAchievements = async () => {
+            try {
+                const res = await fetch('/api/achievements');
+                if (!res.ok) {
+                    throw new Error('Failed to fetch achievements');
+                }
+
+                const achievements = await res.json();
+                return achievements;
+            } catch (err) {
+                console.error('Error fetching achievements:', err);
+                return {};
+            }
+        };
+
+        // Render achievements
+        const renderAchievements = (achievements) => {
+            loadingElement.style.display = 'none';
+            achievementsList.style.display = 'grid';
+
+            const achievementTypes = [
+                'first_tag',
+                'survivor_10min',
+                'survivor_1hour'
+            ];
+
+            achievementTypes.forEach(type => {
+                const achievement = achievements[type] || {};
+                const unlocked = achievement.unlocked || false;
+                const name = achievement.name || getDefaultName(type);
+                const description = achievement.description || getDefaultDescription(type);
+                const unlockDate = achievement.unlockDate ? new Date(achievement.unlockDate) : null;
+
+                const card = document.createElement('div');
+                card.className = `achievement-card ${unlocked ? 'unlocked' : ''}`;
+
+                // Use different icon based on unlocked status
+                const iconClass = unlocked ? 'fas fa-star' : 'far fa-star';
+                const iconColor = unlocked ? '#f1c40f' : '#aaa';
+
+                card.innerHTML = `
+                    <div class="achievement-icon">
+                        <i class="${iconClass}" style="color: ${iconColor};"></i>
+                    </div>
+                    <div class="achievement-title">${name}</div>
+                    <div class="achievement-description">${description}</div>
+                    ${unlocked
+                        ? `<div class="achievement-date">Unlocked: ${formatDate(unlockDate)}</div>`
+                        : `<div class="achievement-locked">Not yet unlocked</div>`
                     }
+                `;
 
-                    const achievements = await res.json();
-                    return achievements;
-                } catch (err) {
-                    console.error('Error fetching achievements:', err);
-                    return {};
-                }
+                achievementsList.appendChild(card);
+            });
+        };
+
+        // Helper functions
+        function getDefaultName(type) {
+            switch(type) {
+                case 'first_tag': return 'First Tag';
+                case 'survivor_10min': return '10-Minute Survivor';
+                case 'survivor_1hour': return 'Ultimate Survivor';
+                default: return 'Unknown Achievement';
+            }
+        }
+
+        function getDefaultDescription(type) {
+            switch(type) {
+                case 'first_tag': return 'Tag another player for the first time';
+                case 'survivor_10min': return 'Stay as "it" for 10 minutes total';
+                case 'survivor_1hour': return 'Stay as "it" for 1 hour total';
+                default: return 'Complete this achievement to find out more';
+            }
+        }
+
+        function formatDate(date) {
+            if (!date) return 'Unknown date';
+
+            const options = {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
             };
 
-            // Render achievements
-            const renderAchievements = (achievements) => {
-                loadingElement.style.display = 'none';
-                achievementsList.style.display = 'grid';
+            return date.toLocaleDateString(undefined, options);
+        }
 
-                const achievementTypes = [
-                    'first_tag',
-                    'survivor_10min',
-                    'survivor_1hour'
-                ];
-
-                achievementTypes.forEach(type => {
-                    const achievement = achievements[type] || {};
-                    const unlocked = achievement.unlocked || false;
-                    const name = achievement.name || getDefaultName(type);
-                    const description = achievement.description || getDefaultDescription(type);
-                    const unlockDate = achievement.unlockDate ? new Date(achievement.unlockDate) : null;
-
-                    const card = document.createElement('div');
-                    card.className = `achievement-card ${unlocked ? 'unlocked' : ''}`;
-                    card.innerHTML = `
-                        <div class="achievement-icon">
-                            <i class="fas fa-star"></i>
-                        </div>
-                        <div class="achievement-title">${name}</div>
-                        <div class="achievement-description">${description}</div>
-                        ${unlocked
-                            ? `<div class="achievement-date">Unlocked: ${formatDate(unlockDate)}</div>`
-                            : `<div class="achievement-locked">Not yet unlocked</div>`
-                        }
-                    `;
-
-                    achievementsList.appendChild(card);
-                });
-            };
-
-            // Helper functions
-            function getDefaultName(type) {
-                switch(type) {
-                    case 'first_tag': return 'First Tag';
-                    case 'survivor_10min': return '10-Minute Survivor';
-                    case 'survivor_1hour': return 'Ultimate Survivor';
-                    default: return 'Unknown Achievement';
-                }
+        // Initialize
+        const init = async () => {
+            const isAuthenticated = await checkAuth();
+            if (isAuthenticated) {
+                const achievements = await fetchAchievements();
+                renderAchievements(achievements);
             }
+        };
 
-            function getDefaultDescription(type) {
-                switch(type) {
-                    case 'first_tag': return 'Tag another player for the first time';
-                    case 'survivor_10min': return 'Stay as "it" for 10 minutes total';
-                    case 'survivor_1hour': return 'Stay as "it" for 1 hour total';
-                    default: return 'Complete this achievement to find out more';
-                }
-            }
-
-            function formatDate(date) {
-                if (!date) return 'Unknown date';
-
-                const options = {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                };
-
-                return date.toLocaleDateString(undefined, options);
-            }
-
-            // Initialize
-            const init = async () => {
-                const isAuthenticated = await checkAuth();
-                if (isAuthenticated) {
-                    const achievements = await fetchAchievements();
-                    renderAchievements(achievements);
-                }
-            };
-
-            init();
-        });
+        init();
+    });
     </script>
 </body>
 </html>

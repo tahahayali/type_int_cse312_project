@@ -69,10 +69,12 @@ def unlock_achievement(username, achievement_name):
     )
 
     if user:
+        print(f"Achievement {achievement_name} already unlocked for {username}")
         return False  # Already unlocked
 
     # Unlock the achievement with timestamp
     now = datetime.now()
+    print(f"Unlocking achievement {achievement_name} for {username}")
     result = users.update_one(
         {"username": username},
         {"$set": {
@@ -81,6 +83,7 @@ def unlock_achievement(username, achievement_name):
         }}
     )
 
+    print(f"Unlock result for {username}.{achievement_name}: modified count = {result.modified_count}")
     return result.modified_count > 0  # True if newly unlocked
 
 def initialize_player_stats(username):
@@ -122,12 +125,45 @@ def increment_user_tags(username, count=1):
         {"$inc": {"totalTags": count}}
     )
 
+
 def increment_user_time(username, seconds):
-    """Atomically bump the totalTimeIt counter."""
+    """
+    Atomically bump the totalTimeIt counter and check for time-based achievements.
+    Returns a list of newly unlocked achievements, if any.
+    """
+    print(f"Incrementing time for {username} by {seconds} seconds")
+
+    # Update the time counter
     users.update_one(
         {"username": username},
         {"$inc": {"totalTimeIt": seconds}}
     )
+
+    # Get the updated user data
+    user = users.find_one({"username": username})
+    if not user:
+        print(f"User {username} not found")
+        return []
+
+    total_time = user.get("totalTimeIt", 0)
+    print(f"User {username} total time: {total_time} seconds")
+    unlocked = []
+
+    # Check for time-based achievements
+    if total_time >= 10:  # 10 minutes (600 seconds)
+        print(f"User {username} qualifies for 10-minute achievement")
+        if unlock_achievement(username, "survivor_10min"):
+            print(f"Unlocked 10-minute achievement for {username}")
+            unlocked.append("survivor_10min")
+
+    if total_time >= 30:  # 1 hour (3600 seconds)
+        print(f"User {username} qualifies for 1-hour achievement")
+        if unlock_achievement(username, "survivor_1hour"):
+            print(f"Unlocked 1-hour achievement for {username}")
+            unlocked.append("survivor_1hour")
+
+    print(f"Achievements unlocked for {username}: {unlocked}")
+    return unlocked
 
 def update_leaderboard(username, new_streak):
     """

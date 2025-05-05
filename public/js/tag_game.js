@@ -8,9 +8,11 @@ import Network from './socket.js';
 class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
-    this.blockedTiles          = new Set();
+    this.blockedTiles = new Set();
     this.lastLeaderboardUpdate = 0;
-    this.dungeonBuilt          = false;
+    this.dungeonBuilt = false;
+    this.activeToasts = []; // Track active toast notifications
+    this.shownAchievements = new Set(); // Track which achievements have been shown
   }
 
   preload() {
@@ -19,26 +21,26 @@ class GameScene extends Phaser.Scene {
 
   create() {
     /* ── empty map shell (tiles come after we get the shared seed) ── */
-    this.tileSize    = 16;
+    this.tileSize = 16;
     this.scaleFactor = 3;
-    this.mapWidth    = 60;
-    this.mapHeight   = 40;
+    this.mapWidth = 60;
+    this.mapHeight = 40;
 
     this.map = this.make.tilemap({
-      tileWidth : this.tileSize,
+      tileWidth: this.tileSize,
       tileHeight: this.tileSize,
-      width     : this.mapWidth,
-      height    : this.mapHeight
+      width: this.mapWidth,
+      height: this.mapHeight
     });
 
-    const tiles      = this.map.addTilesetImage('tiles');
-    this.groundLayer = this.map.createBlankLayer('Ground',  tiles).setScale(this.scaleFactor);
+    const tiles = this.map.addTilesetImage('tiles');
+    this.groundLayer = this.map.createBlankLayer('Ground', tiles).setScale(this.scaleFactor);
     this.objectLayer = this.map.createBlankLayer('Objects', tiles).setScale(this.scaleFactor);
 
     /* placeholder player – becomes real after first snapshot */
     this.player = this.add.circle(0, 0, 16, 0x00ff00).setVisible(false);
 
-    this.cursors        = this.input.keyboard.createCursorKeys();
+    this.cursors = this.input.keyboard.createCursorKeys();
     this.leaderboardKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L);
 
     /* Web-socket wrapper */
@@ -52,11 +54,11 @@ class GameScene extends Phaser.Scene {
     }).setScrollFactor(0).setDepth(1000);
 
     this.add.text(20, 0, 'Reverse Tag: Stay IT longest!', {
-  fontSize: '14px',
-  color: '#aaa',
-  backgroundColor: '#222',
-  padding: { x: 8, y: 3 }
-}).setScrollFactor(0).setDepth(1000);
+      fontSize: '14px',
+      color: '#aaa',
+      backgroundColor: '#222',
+      padding: { x: 8, y: 3 }
+    }).setScrollFactor(0).setDepth(1000);
 
 
     this.add.text(20, 60, 'Press L (or button) to toggle leaderboard', {
@@ -67,11 +69,12 @@ class GameScene extends Phaser.Scene {
       fontSize: '18px', color: '#fff', backgroundColor: '#333', padding: { x: 10, y: 5 }
     }).setScrollFactor(0).setDepth(1000);
 
-    /* wire any DOM “leaderboard-toggle” button (optional) */
+    /* wire any DOM "leaderboard-toggle" button (optional) */
     const domToggle = document.getElementById('leaderboard-toggle');
     if (domToggle) domToggle.addEventListener('click', () => this.toggleLeaderboard());
   }
-     buildDungeon(seed) {
+
+  buildDungeon(seed) {
     if (this.dungeonBuilt) return;
     Phaser.Math.RND = new Phaser.Math.RandomDataGenerator([seed]);
     this.randomizeRoom();
@@ -125,9 +128,10 @@ class GameScene extends Phaser.Scene {
       this.network.requestLeaderboard();
       this.lastLeaderboardUpdate = Date.now();
     }
+
+    /* Update toast positions if needed */
+    this.updateToastPositions();
   }
-
-
 
 
 
@@ -156,6 +160,92 @@ class GameScene extends Phaser.Scene {
       this.statusText.setText('Stay IT! Run from others!').setColor('#ff0000');
     } else {
       this.statusText.setText('Chase the IT player!').setColor('#00ff00');
+    }
+  }
+
+  /* Achievement toast notification system */
+  showAchievementToast(data) {
+    console.log('Showing achievement toast:', data);
+
+    // Check if we've already shown this achievement in this session
+    const achievementKey = data.achievement;
+    if (this.shownAchievements.has(achievementKey)) {
+      console.log(`Achievement ${achievementKey} already shown, skipping toast`);
+      return;
+    }
+
+    // Mark this achievement as shown
+    this.shownAchievements.add(achievementKey);
+
+    // Get achievement icon based on type
+    let iconClass = 'fa-trophy';
+    let iconColor = '#f1c40f';
+
+    if (data.achievement === 'first_tag') {
+      iconClass = 'fa-tag';
+    } else if (data.achievement === 'survivor_10min') {
+      iconClass = 'fa-stopwatch';
+    } else if (data.achievement === 'survivor_1hour') {
+      iconClass = 'fa-medal';
+    }
+
+    // Create toast DOM element
+    const toast = document.createElement('div');
+    toast.className = 'achievement-toast';
+    toast.innerHTML = `
+      <div class="toast-icon"><i class="fas ${iconClass}" style="color: ${iconColor};"></i></div>
+      <div class="toast-content">
+        <div class="toast-title">Achievement Unlocked!</div>
+        <div class="toast-message">${data.name}: ${data.description}</div>
+      </div>
+    `;
+
+    document.body.appendChild(toast);
+
+    // Try to play a sound effect if available
+    try {
+      const audio = new Audio('/assets/sounds/achievement.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(err => console.log('Audio play failed:', err));
+    } catch (err) {
+      console.log('No achievement sound available');
+    }
+
+    // Add to active toasts array
+    if (!this.activeToasts) this.activeToasts = [];
+    this.activeToasts.push(toast);
+
+    // Position and show with animation
+    setTimeout(() => {
+      toast.classList.add('show');
+      this.updateToastPositions();
+    }, 100);
+
+    // Remove after display
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => {
+        toast.remove();
+        const index = this.activeToasts.indexOf(toast);
+        if (index > -1) {
+          this.activeToasts.splice(index, 1);
+        }
+        this.updateToastPositions();
+      }, 500);
+    }, 5000);
+  }
+
+  // Update positions of multiple toasts
+  updateToastPositions() {
+    if (!this.activeToasts || this.activeToasts.length <= 1) return;
+
+    let currentOffset = 0;
+    for (let i = 0; i < this.activeToasts.length; i++) {
+      const toast = this.activeToasts[i];
+      if (!toast) continue;
+
+      toast.style.bottom = `${30 + currentOffset}px`;
+      currentOffset += toast.offsetHeight + 10; // 10px gap between toasts
     }
   }
 
@@ -237,4 +327,4 @@ class GameScene extends Phaser.Scene {
     scene: GameScene,
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
   });
-})();
+})()

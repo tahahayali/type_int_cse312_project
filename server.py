@@ -1,5 +1,5 @@
 import eventlet
-from db.database import get_leaderboard, get_aggregated_leaderboard
+from db.database import get_leaderboard, get_aggregated_leaderboard, get_user_achievements
 eventlet.monkey_patch()
 
 import os
@@ -67,6 +67,16 @@ def get_leaderboard():
     board = get_aggregated_leaderboard(limit=50)
     return jsonify(board), 200
 
+@app.route('/api/achievements')
+@token_required
+def get_achievements():
+    """
+    Get achievements for the current user
+    """
+    username = g.username
+    achievements = get_user_achievements(username)
+    return jsonify(achievements), 200
+
 
 #_____________________________________________________________________
 
@@ -92,6 +102,10 @@ def game():
 @app.route('/')
 def home():
     return send_from_directory('public/html', 'home_page.html')
+
+@app.route('/achievements')
+def achievements_page():
+    return send_from_directory('public/html', 'achievements.html')
 
 @app.route('/upload_avatar_page')
 def upload_avatar_page():
