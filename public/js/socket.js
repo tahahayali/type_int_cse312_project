@@ -112,8 +112,10 @@ export default class Network {
 
   /* ── movement from server ───────────────────────────────── */
   move({ id, x, y }) {
-    if (!this.players[id]) return;
-    this.players[id].container.setPosition(x, y);
+  if (id === this.myID) return;
+  if (!this.players[id]) return;
+
+   this.players[id].container.setPosition(x, y);
   }
 
   /* ── player left ────────────────────────────────────────── */
