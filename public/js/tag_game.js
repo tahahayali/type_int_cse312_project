@@ -10,6 +10,7 @@ class GameScene extends Phaser.Scene {
     super('GameScene');
     this.blockedTiles          = new Set();
     this.lastLeaderboardUpdate = 0;
+    this.dungeonBuilt          = false;
   }
 
   preload() {
@@ -42,7 +43,8 @@ class GameScene extends Phaser.Scene {
 
     /* Web-socket wrapper */
     this.network = new Network(this);
-    this.network.socket.on('init', data => this.handleInit(data));
+
+    this.network.socket.on('init', data => this.buildDungeon(data.seed));
 
     /* ── static UI text ── */
     this.add.text(20, 20, 'Use arrow keys to move', {
@@ -69,137 +71,75 @@ class GameScene extends Phaser.Scene {
     const domToggle = document.getElementById('leaderboard-toggle');
     if (domToggle) domToggle.addEventListener('click', () => this.toggleLeaderboard());
   }
-
-  /* ───────────────────────── First snapshot from server ───────────────────────── */
-  handleInit(data) {
-    /* 1. lock RNG so each client builds the SAME dungeon */
-    Phaser.Math.RND = new Phaser.Math.RandomDataGenerator([data.seed]);
-
-    /* 2. now we can randomise tiles and mark blocked positions */
+     buildDungeon(seed) {
+    if (this.dungeonBuilt) return;
+    Phaser.Math.RND = new Phaser.Math.RandomDataGenerator([seed]);
     this.randomizeRoom();
     this.recordBlockedTiles();
-
-    /* 3. spawn ourselves – but never on a blocked tile */
-    const me       = data.players[data.id];
-    const tileSize = this.tileSize * this.scaleFactor;
-
-    let spawnX = me.x;
-    let spawnY = me.y;
-    const tileX = Math.floor(spawnX / tileSize);
-    const tileY = Math.floor(spawnY / tileSize);
-
-    if (this.blockedTiles.has(`${tileX},${tileY}`)) {
-      const safe   = this.getSafeSpawn();
-      spawnX       = safe.x;
-      spawnY       = safe.y;
-      this.network.sendMove(spawnX, spawnY);       // tell server right away
-    }
-
-    this.player
-      .setPosition(spawnX, spawnY)
-      .setFillStyle(me.it ? 0xff0000 : 0x00ff00)
-      .setStrokeStyle(me.it ? 4 : 0, 0xff0000)
-      .setVisible(true);
-
-    this.cameras.main.startFollow(this.player);
-    this.cameras.main.setBounds(
-      0, 0,
-      this.map.width  * this.tileSize * this.scaleFactor,
-      this.map.height * this.tileSize * this.scaleFactor
-    );
-
-    this.updateStatusText();
+    this.dungeonBuilt = true;
   }
 
-  /* ───────────────────────── Every frame ───────────────────────── */
-  update() {
-    if (!this.player.visible) return;   // still waiting for init()
 
+ /* ───────────────────────── Every frame ───────────────────────── */
+  update() {
+    const mover = this.playerContainer || this.player;
+    if (!mover.visible && !this.playerContainer) return;   // not spawned yet
+
+    /* movement input */
     const speed = 2.2, ts = this.tileSize * this.scaleFactor;
     let dx = 0, dy = 0;
-
     if (this.cursors.left.isDown)  dx = -speed;
     else if (this.cursors.right.isDown) dx =  speed;
     if (this.cursors.up.isDown)    dy = -speed;
     else if (this.cursors.down.isDown)  dy =  speed;
 
-    const newX = this.player.x + dx, newY = this.player.y + dy,
-          tileXc = Math.floor(this.player.x / ts), tileYc = Math.floor(this.player.y / ts),
-          tileXn = Math.floor(newX / ts),          tileYn = Math.floor(newY   / ts),
+    /* wall collision */
+    const newX = mover.x + dx, newY = mover.y + dy,
+          tileXc = Math.floor(mover.x / ts), tileYc = Math.floor(mover.y / ts),
+          tileXn = Math.floor(newX  / ts),   tileYn = Math.floor(newY  / ts),
           blockedX = this.blockedTiles.has(`${tileXn},${tileYc}`),
           blockedY = this.blockedTiles.has(`${tileXc},${tileYn}`);
 
     let moved = false;
-    if (!blockedX) { this.player.x = newX; moved = true; }
-    if (!blockedY) { this.player.y = newY; moved = true; }
-    if (moved) this.network.sendMove(this.player.x, this.player.y);
+    if (!blockedX) { mover.x = newX; moved = true; }
+    if (!blockedY) { mover.y = newY; moved = true; }
+    if (moved) this.network.sendMove(mover.x, mover.y);
 
-    /* collision-based tagging */
-    // if (this.network.isIt) {
-    //   for (const id in this.network.players)
-    //   {
-    //     const other = this.network.players[id];
-    //     if (!other) continue;
-    //     const dist = Phaser.Math.Distance.Between(
-    //       this.player.x, this.player.y, other.container.x, other.container.y
-    //     );
-    //     if (dist < 32) {
-    //       this.network.sendTag(id);
-    //       const { circle } = other;
-    //       const s0 = circle.scaleX;
-    //       circle.setScale(1.5);
-    //       this.tweens.add({ targets: circle, scaleX: s0, scaleY: s0, duration: 200, ease: 'Quad.easeOut' });
-    //     }
-    //   }
-    // }
-// only non–IT players bump the IT player to tag
+    /* bump‑to‑tag (reverse tag) */
     if (!this.network.isIt) {
-      for (const id in this.network.players) {
-        const other = this.network.players[id];
-        if (!other.it) continue;    // skip anyone who isn't IT
+      for (const p of Object.values(this.network.players)) {
+        if (!p.it) continue;
         const dist = Phaser.Math.Distance.Between(
-            this.player.x, this.player.y,
-            other.container.x, other.container.y
-        );
+          mover.x, mover.y, p.container.x, p.container.y);
         if (dist < 32) {
-          console.log(`Bumping IT (${id}), sending tag…`);
-          this.network.sendTag(id);
-          // brief pulse on their circle
-          const {circle} = other;
-          const origScale = circle.scaleX;
-          circle.setScale(1.5);
-          this.tweens.add({
-            targets: circle,
-            scaleX: origScale,
-            scaleY: origScale,
-            duration: 200,
-            ease: 'Quad.easeOut'
-          });
-          break;  // only tag once per bump
+          this.network.sendTag(p.id);
+          break;
         }
       }
     }
 
-
-    /* L key toggles leaderboard */
+    /* leaderboard maintenance */
     if (Phaser.Input.Keyboard.JustDown(this.leaderboardKey)) this.toggleLeaderboard();
-
-    /* refresh leaderboard every second while visible */
-    if (this.network?.leaderboardVisible &&
+    if (this.network.leaderboardVisible &&
         (!this.lastLeaderboardUpdate || Date.now() - this.lastLeaderboardUpdate > 1000)) {
       this.network.requestLeaderboard();
       this.lastLeaderboardUpdate = Date.now();
     }
   }
 
-  /* ───────────────────────── UI helpers ───────────────────────── */
+
+
+
+
+   /* ───────────────────────── UI helpers ───────────────────────── */
   toggleLeaderboard() {
     if (!this.network || !this.leaderboard) return;
     this.network.leaderboardVisible = !this.network.leaderboardVisible;
     this.network.updateLeaderboardUI();
-    this.leaderboard.toggleButton.setText(this.network.leaderboardVisible ? 'Hide Leaderboard' : 'Show Leaderboard');
+    this.leaderboard.toggleButton.setText(
+      this.network.leaderboardVisible ? 'Hide Leaderboard' : 'Show Leaderboard'
+    );
 
-    /* keep any DOM leaderboard in sync (optional) */
     const domLb = document.getElementById('leaderboard'),
           domTg = document.getElementById('leaderboard-toggle');
     if (domLb && domTg) {
@@ -285,33 +225,16 @@ class GameScene extends Phaser.Scene {
 }
 
 /* ───────────────────────── Launch Phaser ───────────────────────── */
-
-// ⬇️ ADD this async main() function
-async function main() {
-    try {
-        const res = await fetch('/api/current-user');
-        if (!res.ok) {
-            console.log('Not authenticated, redirecting to home.');
-            window.location.href = '/';
-            return;
-        }
-    } catch (err) {
-        console.error('Error checking login:', err);
-        window.location.href = '/';
-        return;
-    }
-
-    console.log('Authenticated, starting game.');
-    // only create game after verifying login
-    new Phaser.Game({
-      type           : Phaser.AUTO,
-      width          : window.innerWidth,
-      height         : window.innerHeight,
-      backgroundColor: '#111',
-      pixelArt       : true,
-      scene          : GameScene,
-      scale          : { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
-    });
-}
-
-main();
+(async () => {
+  const res = await fetch('/api/current-user');
+  if (!res.ok) return (window.location.href = '/');
+  new Phaser.Game({
+    type: Phaser.AUTO,
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: '#111',
+    pixelArt: true,
+    scene: GameScene,
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH }
+  });
+})();

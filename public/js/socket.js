@@ -1,190 +1,162 @@
 /*  public/js/socket.js  */
-export default class Network {
-    constructor(scene) {
-        this.scene     = scene;
-        this.players   = {};
-        this.myID      = null;
-        this.isIt      = false;
-        this.itTimes   = {};  // Store "it" times for leaderboard
-        this.leaderboardVisible = false; // Track if leaderboard is visible
-        this.tagCooldown = false; // Prevent rapid tagging
+export function loadAvatarTexture(scene, key, url) {
+  return new Promise(async resolve => {
+    if (!url)          return resolve(null);
+    if (scene.textures.exists(key)) return resolve(key);  // cached
 
-        // /* include username if we have it */
-        // const storedName = localStorage.getItem('tag_username') || '';
-        //
-        // this.socket = io({
-        //     transports: ['websocket'],
-        //     upgrade   : false,
-        //     query     : { username: storedName }
-        // });
-    // connect over WS, rely on auth_token cookie (no more username query)
-        this.socket = io({
-            transports: ['websocket'],
-            upgrade   : false
-        });
+    /* fetch the image as a blob, turn into Data‑URL */
+    const resp = await fetch(url);
+    if (!resp.ok)      return resolve(null);
 
+    const blob   = await resp.blob();
+    const b64url = await new Promise(res => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result);       // “data:image/png;base64,…”
+      fr.readAsDataURL(blob);
+    });
 
-        /* ----- server → client ----- */
-        this.socket.on('init',           data => this.handleInit(data));
-        this.socket.on('playerJoined',   data => this.spawn(data));
-        this.socket.on('playerMoved',    data => this.move(data));
-        this.socket.on('playerLeft',     data => this.remove(data));
-        this.socket.on('tagUpdate',      data => this.updateTags(data));
-        this.socket.on('leaderboardUpdate', data => this.updateLeaderboard(data));
+    /* when Phaser finishes decoding it fires 'addtexture' */
+    const onAdd = textureKey => {
+      if (textureKey === key) {
+        scene.textures.off('addtexture', onAdd);
+        resolve(key);
+      }
+    };
+    scene.textures.on('addtexture', onAdd);
 
-        // Add debugging for socket events
-        this.socket.onAny((event, ...args) => {
-            //console.log(`Socket event: ${event}`, args);
-        });
-    }
-
-    /* ---------- event helpers ---------- */
-    handleInit(data) {
-        this.myID = data.id;
-        const me  = data.players[this.myID];
-        this.isIt = me.it;
-        this.itTimes = data.it_times || {};
-
-        console.log(`Initial state - myID: ${this.myID}, isIt: ${this.isIt}`);
-
-        this.scene.player
-            .setFillStyle(this.isIt ? 0xff0000 : 0x00ff00)
-            .setStrokeStyle(this.isIt ? 4 : 0, 0xff0000);
-
-        // for (const id in data.players) {
-        //     if (id === this.myID) continue;
-        //     const p = data.players[id];
-        //     this.spawn({ id, ...p });
-        // }
-
-        // only spawn *new* players
-       for (const id in data.players) {
-           if (id === this.myID || this.players[id]) continue;
-           const p = data.players[id];
-           this.spawn({ id, ...p });
-       }
-
-        this.updateActivePlayers();
-
-        // Create leaderboard UI if not already created
-        if (!this.scene.leaderboard) {
-            this.createLeaderboardUI();
-        }
-    }
-
-    spawn({ id, x, y, it, name = '' })
-    {
-     // skip if already spawned (duplicate init)
-       if (this.players[id]) {
-           const entry = this.players[id];
-           entry.container.setPosition(x, y);
-           entry.circle.setFillStyle(it ? 0xff0000 : 0x0000ff);
-           return;
-       }
-        const circle = this.scene.add
-            .circle(0, 0, 16, it ? 0xff0000 : 0x0000ff)
-            .setStrokeStyle(it ? 4 : 0, 0xff0000);
-
-        const label  = this.scene.add
-            .text(0, -24, name || id.slice(0, 4), { fontSize: '12px', color: '#fff' })
-            .setOrigin(0.5);
-
-        const container = this.scene.add.container(x, y, [circle, label]);
-        this.players[id] = { container, circle, label, it: it };
-
-        console.log(`Spawned player ${id} at (${x}, ${y}), it: ${it}`);
-        this.updateActivePlayers();
-    }
-
-    move({ id, x, y }) {
-        if (id === this.myID) return;
-        const entry = this.players[id];
-        if (entry) {
-            entry.container.x = x;
-            entry.container.y = y;
-        }
-    }
-
-    remove({ id }) {
-        const entry = this.players[id];
-        if (entry) {
-            entry.container.destroy(true);
-            delete this.players[id];
-            console.log(`Player ${id} removed`);
-            this.updateActivePlayers();
-
-        }
-    }
-
-    updateTags({ newIt, prevIt }) {
-        console.log(`Tag update - newIt: ${newIt}, prevIt: ${prevIt}, myID: ${this.myID}`);
-
-        /* our own status */
-        if (newIt === this.myID) {
-            this.isIt = true;
-            this.scene.player
-                .setFillStyle(0xff0000)
-                .setStrokeStyle(4, 0xff0000);
-            console.log('I am now IT!');
-        } else if (prevIt === this.myID) {
-            this.isIt = false;
-            this.scene.player
-                .setFillStyle(0x00ff00)
-                .setStrokeStyle(0, 0xff0000);
-            console.log('I am no longer IT!');
-        }
-
-        /* remote players */
-        if (newIt && this.players[newIt]) {
-            this.players[newIt].it = true;
-            this.players[newIt].circle.setFillStyle(0xff0000);
-            this.players[newIt].circle.setStrokeStyle(4, 0xff0000);
-            console.log(`Player ${newIt} is now IT`);
-        }
-
-        if (prevIt && this.players[prevIt]) {
-            this.players[prevIt].it = false;
-            this.players[prevIt].circle.setFillStyle(0x0000ff);
-            this.players[prevIt].circle.setStrokeStyle(0, 0xff0000);
-            console.log(`Player ${prevIt} is no longer IT`);
-        }
-
-        // Update status text if available
-        if (this.scene.updateStatusText) {
-            this.scene.updateStatusText();
-        }
-    }
-
-    updateLeaderboard(data) {
-        this.itTimes = data.it_times || {};
-        this.updateLeaderboardUI();
-    }
-
-    /* ---------- client → server ---------- */
-    sendMove(x, y) {
-        this.socket.emit('move', { x, y });
-    }
-
-    // sendTag(id) {
-    // // Only send tag if we're "it" (cooldown is now handled server-side)
-    // if (this.isIt) {
-    //     console.log(`Sending tag event for player ${id}`);
-    //     this.socket.emit('tag', { id });
-    // } else {
-    //     console.log('Not IT, cannot tag');
-    // }
-    // }
-
-    sendTag(id) {
-    console.log(`Attempting tag event on ${id}`);
-    this.socket.emit('tag', { id });
+    /* kick off async decode */
+    scene.textures.addBase64(key, b64url);
+  });
 }
 
 
+/* ─── Network wrapper ──────────────────────────────────────── */
+export default class Network {
+  constructor(scene) {
+    this.scene     = scene;
+    this.players   = {};   // id → {container|circle, it, …}
+    this.myID      = null;
+    this.isIt      = false;
+    this.itTimes   = {};
+    this.leaderboardVisible = false;
 
-    requestLeaderboard() {
-        this.socket.emit('getLeaderboard');
+    this.socket = io({ transports: ['websocket'], upgrade: false });
+
+    /* server → client */
+    this.socket.on('init',            async data => await this.handleInit(data));
+    this.socket.on('playerJoined',    async data => await this.spawn(data));
+    this.socket.on('playerMoved',           data => this.move(data));
+    this.socket.on('playerLeft',            data => this.remove(data));
+    this.socket.on('tagUpdate',             data => this.updateTags(data));
+    this.socket.on('leaderboardUpdate',     data => this.updateLeaderboard(data));
+  }
+
+  /* ── first snapshot ─────────────────────────────────────── */
+  async handleInit(data) {
+    this.myID    = data.id;
+    this.isIt    = data.players[this.myID].it;
+    this.itTimes = data.it_times || {};
+
+    /* spawn ALL players (self + existing) */
+    for (const [id, info] of Object.entries(data.players)) {
+      await this.spawn({ id, ...info });
     }
+
+    /* create leaderboard UI once */
+    if (!this.scene.leaderboard) this.createLeaderboardUI();
+    this.updateActivePlayers();
+  }
+
+  /* ── spawn (first time or on join) ───────────────────────── */
+  async spawn({ id, x, y, it, name = '', avatar }) {
+    if (this.players[id]) return;    // already spawned
+
+    /* 1) base circle */
+    const circle = this.scene.add
+      .circle(0, 0, 16, it ? 0xff0000 : 0x0000ff)
+      .setStrokeStyle(it ? 4 : 0, 0xff0000);
+
+    /* 2) optional avatar image */
+    let parts = [circle];
+    if (avatar) {
+      const key = `avt-${id}`;
+      const tex = await loadAvatarTexture(this.scene, key, avatar);
+      if (tex) {
+        const img = this.scene.add.image(0, 0, tex)
+                         .setDisplaySize(24, 24)
+                         .setOrigin(0.5);
+        parts.push(img);
+      }
+    }
+
+    /* 3) name label (needed for leaderboard) */
+    const label = this.scene.add.text(
+      0, -24, name || id.slice(0, 4),
+      { fontSize: '12px', color: '#fff' }
+    ).setOrigin(0.5);
+    parts.push(label);
+
+    /* 4) container */
+    const container = this.scene.add.container(x, y, parts);
+
+    /* save ref */
+    this.players[id] = { id, it, circle, container, label };
+
+    /* self special‑case: enable camera follow */
+    if (id === this.myID) {
+      this.scene.player          = circle;
+      this.scene.playerContainer = container;
+      this.scene.cameras.main.startFollow(container);
+    }
+  }
+
+  /* ── movement from server ───────────────────────────────── */
+  move({ id, x, y }) {
+    if (!this.players[id]) return;
+    this.players[id].container.setPosition(x, y);
+  }
+
+  /* ── player left ────────────────────────────────────────── */
+  remove({ id }) {
+    const p = this.players[id];
+    if (!p) return;
+    p.container.destroy(true);
+    delete this.players[id];
+    this.updateActivePlayers();
+  }
+
+  /* ── tag updates ───────────────────────────────────────── */
+  updateTags({ newIt, prevIt }) {
+    const setItState = (id, isIt) => {
+      const p = this.players[id];
+      if (!p) return;
+      p.it = isIt;
+      p.circle.setFillStyle(isIt ? 0xff0000 : 0x0000ff)
+              .setStrokeStyle(isIt ? 4 : 0, 0xff0000);
+    };
+    if (newIt)  setItState(newIt,  true);
+    if (prevIt) setItState(prevIt, false);
+    if (this.myID === newIt)  this.isIt = true;
+    if (this.myID === prevIt) this.isIt = false;
+    if (this.scene.updateStatusText) this.scene.updateStatusText();
+  }
+
+  /* ── leaderboard push ──────────────────────────────────── */
+  updateLeaderboard(data) {
+    this.itTimes = data.it_times || {};
+    this.updateLeaderboardUI();
+  }
+
+  /* ── client → server ───────────────────────────────────── */
+  sendMove(x, y) { this.socket.emit('move', { x, y }); }
+  sendTag(id)    { this.socket.emit('tag',  { id });   }
+  requestLeaderboard() { this.socket.emit('getLeaderboard'); }
+
+  /* ── helper: active players to DOM ─────────────────────── */
+  updateActivePlayers() {
+    const active = Object.fromEntries(Object.keys(this.players).map(id => [id, true]));
+    if (window.updateActivePlayers) window.updateActivePlayers(active);
+  }
 
     /* ---------- leaderboard UI ---------- */
     createLeaderboardUI() {
@@ -408,28 +380,6 @@ export default class Network {
         // Update DOM leaderboard if available
         if (window.updateDOMLeaderboard) {
             window.updateDOMLeaderboard(leaderboardData);
-        }
-    }
-
-    // Add this function to the socket.js file after the updateLeaderboardUI function
-
-    updateActivePlayers() {
-        // Create a map of active player IDs
-        const activePlayers = {};
-
-        // Add all current players to the active players list
-        for (const id in this.players) {
-            activePlayers[id] = true;
-        }
-
-        // Also add the current player
-        if (this.myID) {
-            activePlayers[this.myID] = true;
-        }
-
-        // Update the DOM with active players if the function exists
-        if (window.updateActivePlayers) {
-            window.updateActivePlayers(activePlayers);
         }
     }
 

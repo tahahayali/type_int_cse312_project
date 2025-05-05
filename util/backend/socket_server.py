@@ -1,8 +1,12 @@
+from typing import Optional
+
 from flask import Flask, request
 from flask_socketio import SocketIO, emit
 import random, time, eventlet
 eventlet.monkey_patch()          # ✱ for the background task
 from util.backend.map_generator import generate_blocked_tiles
+import os
+
 
 app               = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret'
@@ -21,6 +25,13 @@ it_times          = {}   # sid → {'total', 'started_at'}
 became_it_time    = {}   # sid → last-time-became-it
 
 
+
+
+ALLOWED_EXTENSIONS_ON_DISK = ("png", "jpg", "jpeg")
+
+
+
+
 # ───────────────────────── helpers ──────────────────────────
 def build_leaderboard():
     """Return a dict that always contains *exactly one* started_at (the red player)."""
@@ -33,6 +44,14 @@ def build_leaderboard():
         }
     return board
 
+def get_avatar_url(username: str) -> Optional[str]:
+    """Return '/static/avatars/<file>' or None if no avatar exists."""
+    for ext in ALLOWED_EXTENSIONS_ON_DISK:
+        candidate = f"static/avatars/{username}.{ext}"
+        if os.path.exists(candidate):
+            return f"/{candidate}"        # leading slash for URL
+    return None
+
 
 # ───────────────────── socket events ────────────────────────
 @app.route('/')
@@ -44,6 +63,7 @@ def index():
 def on_connect():
     sid       = request.sid
     username  = request.args.get('username', f'user-{sid[:4]}')
+    avatar_url = get_avatar_url(username)
     tile_size = 16 * 3  # tileSize * scaleFactor from JS
     map_width = 60
     map_height = 40
@@ -64,7 +84,8 @@ def on_connect():
     'y': spawn_y,
     'tile': (tile_x, tile_y),  # ✅ added line
     'it': is_it,
-    'name': username
+    'name': username,
+        "avatar": avatar_url
     }
 
     it_times[sid] = {'total': 0, 'started_at': time.time() if is_it else None}
@@ -74,7 +95,7 @@ def on_connect():
     emit('init',          {'id': sid, 'seed': MAP_SEED,
                            'players': players, 'it_times': build_leaderboard()})
     emit('playerJoined',  {'id': sid, 'x': spawn_x, 'y': spawn_y,
-                           'it': is_it, 'name': username},
+                           'it': is_it, 'name': username, 'avatar': avatar_url},
                            broadcast=True, include_self=False)
     emit('leaderboardUpdate', {'it_times': build_leaderboard()}, broadcast=True)
 
