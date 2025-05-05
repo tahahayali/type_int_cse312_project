@@ -47,6 +47,7 @@ users          = db["users"]
 sessions       = db["sessions"]
 login_attempts = db["loginAttempts"]
 stats          = db["stats"]  # you may repurpose or drop this
+leaderboard    = db["leaderboard"]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Existing helper
@@ -95,3 +96,50 @@ def increment_user_time(username, seconds):
         {"username": username},
         {"$inc": {"totalTimeIt": seconds}}
     )
+
+def update_leaderboard(username, new_streak):
+    """
+    Update the leaderboard to store the user's longest streak.
+    Only updates if new_streak is higher.
+    """
+    leaderboard.update_one(
+        {"user": username},
+        {"$max": {"longestStreak": new_streak}},
+        upsert=True
+    )
+
+def get_leaderboard(limit=10):
+    """
+    Return a sorted list of top users by longestStreak.
+    """
+    return list(
+        leaderboard.find({}, {"_id": 0}).sort("longestStreak", -1).limit(limit)
+    )
+
+def get_aggregated_leaderboard(limit=50):
+    """
+    Return leaderboard using MongoDB aggregation:
+    - Top users with totalTags, totalTimeIt
+    - Computed field: tagsPerMinute
+    """
+    pipeline = [
+        {
+            "$project": {
+                "_id": 0,
+                "username": 1,
+                "totalTags": 1,
+                "totalTimeIt": 1,
+                "tagsPerMinute": {
+                    "$cond": [
+                        {"$eq": ["$totalTimeIt", 0]},
+                        0,
+                        {"$multiply": [{"$divide": ["$totalTags", "$totalTimeIt"]}, 60]}
+                    ]
+                }
+            }
+        },
+        {"$sort": {"totalTimeIt": 1}},  # Sort by least time as "it"
+        {"$limit": limit}
+    ]
+
+    return list(users.aggregate(pipeline))
