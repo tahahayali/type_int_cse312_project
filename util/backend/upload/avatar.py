@@ -1,7 +1,7 @@
 import os
-from flask import request, jsonify, current_app
+from flask import request, jsonify
 from werkzeug.utils import secure_filename
-from PIL import Image
+from PIL import Image, ImageOps
 from util.backend.logger import logging
 from datetime import datetime, timezone
 
@@ -41,9 +41,10 @@ def upload_avatar():
             filename = secure_filename(username + ".png")  # Always save as .png
             filepath = os.path.join(AVATAR_DIR, filename)
 
-            image = Image.open(file.stream).convert("RGB")
-            image = image.resize((128, 128))
-            image.save(filepath)
+            # Open and center-crop to square
+            image = Image.open(file.stream).convert("RGBA")
+            cropped = ImageOps.fit(image, (128, 128), Image.LANCZOS, centering=(0.5, 0.5))
+            cropped.save(filepath, format='PNG')
 
             # Log it
             timestamp = datetime.now(timezone.utc).isoformat()
