@@ -148,13 +148,13 @@ def fallback(path):
     except:
         return abort(404)
 
-# =================== Server Start ===================
-
-if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=8080)
-# ---------------------------
 
 @app.route("/leaderboard", methods=["GET"])
 def longest_streak_leaderboard():
     leaderboard_data = get_leaderboard()
     return jsonify(leaderboard_data)
+# =================== Server Start ===================
+
+if __name__ == "__main__":
+    socketio.run(app, host="0.0.0.0", port=8080)
+# ---------------------------
