@@ -69,7 +69,7 @@
   </table>
 
   <script>
-    fetch('/api/leaderboard')
+    fetch('/leaderboard')
       .then(res => res.json())
       .then(data => {
         const body = document.getElementById('board-body');
