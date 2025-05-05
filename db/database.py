@@ -57,26 +57,58 @@ def update_user_time_as_it(username, total_seconds):
         {"$set": {"time_as_it": total_seconds}}
     )
 
+
 def unlock_achievement(username, achievement_name):
-    users.update_one(
-        {"username": username},
-        {"$set": {f"achievements.{achievement_name}": True}}
+    """
+    Unlock an achievement for a user and record the unlock date.
+    Returns True if this was a new unlock, False if already unlocked.
+    """
+    # Check if achievement is already unlocked
+    user = users.find_one(
+        {"username": username, f"achievements.{achievement_name}.unlocked": True}
     )
+
+    if user:
+        return False  # Already unlocked
+
+    # Unlock the achievement with timestamp
+    now = datetime.now()
+    result = users.update_one(
+        {"username": username},
+        {"$set": {
+            f"achievements.{achievement_name}.unlocked": True,
+            f"achievements.{achievement_name}.unlockDate": now
+        }}
+    )
+
+    return result.modified_count > 0  # True if newly unlocked
 
 def initialize_player_stats(username):
     """Ensure every new user has the base stats fields."""
     users.update_one(
         {"username": username},
         {"$setOnInsert": {
-            "time_as_it":   0,
+            "time_as_it": 0,
             "achievements": {
-                "first_tag":    False,
-                "no_tag_win":   False,
-                "longest_chase":False
+                "first_tag": {
+                    "unlocked": False,
+                    "name": "First Tag",
+                    "description": "Tag another player for the first time"
+                },
+                "survivor_10min": {
+                    "unlocked": False,
+                    "name": "10-Minute Survivor",
+                    "description": "Stay as 'it' for 10 minutes total"
+                },
+                "survivor_1hour": {
+                    "unlocked": False,
+                    "name": "Ultimate Survivor",
+                    "description": "Stay as 'it' for 1 hour total"
+                }
             },
             # ───────── new fields ─────────
-            "totalTags":    0,
-            "totalTimeIt":  0
+            "totalTags": 0,
+            "totalTimeIt": 0
         }},
         upsert=True
     )
@@ -143,3 +175,12 @@ def get_aggregated_leaderboard(limit=50):
     ]
 
     return list(users.aggregate(pipeline))
+
+def get_user_achievements(username):
+    """
+    Get all achievements for a user
+    """
+    user = users.find_one({"username": username}, {"_id": 0, "achievements": 1})
+    if user and "achievements" in user:
+        return user["achievements"]
+    return {}
